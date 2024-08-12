@@ -182,8 +182,8 @@ class DBWResp(implicit p: Parameters)       extends DJBundle                    
 class NodeFDBData(implicit p: Parameters)   extends DJBundle with HasDBData                              with HasToIDBits
 class NodeTDBData(implicit p: Parameters)   extends DJBundle with HasDBData                 with HasDBID with HasToIDBits
 
-class DBBundle(hasRCReq: Boolean = false)(implicit p: Parameters) extends DJBundle {
-    val dbRCReqOpt  = if(hasRCReq) Some(Decoupled(new DBRCReq)) else None
+class DBBundle(hasDBRCReq: Boolean = false)(implicit p: Parameters) extends DJBundle {
+    val dbRCReqOpt  = if(hasDBRCReq) Some(Decoupled(new DBRCReq)) else None
     val wReq        = Decoupled(new DBWReq)
     val wResp       = Flipped(Decoupled(new DBWResp))
     val dataFDB     = Flipped(Decoupled(new NodeFDBData))

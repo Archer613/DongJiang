@@ -9,7 +9,7 @@ import xs.utils._
 import Utils.FastArb._
 import Utils.IDConnector._
 
-class RnMaster(rnMasId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slice = true, hasRCReq = true) {
+class RnMaster(rnMasId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slice = true, hasDBRCReq = true) {
   val nodeParam = djparam.rnNodeMes(rnMasId)
 
 // --------------------- IO declaration ------------------------//
@@ -65,10 +65,10 @@ class RnMaster(rnMasId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Sli
   rxDat.io.dataTDB <> io.dbSigs.dataTDB
   rxDat.io.reqBufDBIDVec <> reqBuf.io.reqBufDBIDVec
 
-  reqBuf.io.req2Slice <> io.req2Slice
-  reqBuf.io.resp2Node <> io.resp2Node
-  reqBuf.io.req2Node <> io.req2NodeOpt.get
-  reqBuf.io.resp2Slice <> io.resp2Sliceopt.get
+  reqBuf.io.req2Slice <> io.req2SliceOpt.get
+  reqBuf.io.resp2Node <> io.resp2NodeOpt.get
+  reqBuf.io.req2Node <> io.req2Node
+  reqBuf.io.resp2Slice <> io.resp2Slice
   reqBuf.io.wReq <> io.dbSigs.wReq
   reqBuf.io.wResp <> io.dbSigs.wResp
   reqBuf.io.dbRCReq <> io.dbSigs.dbRCReqOpt.get

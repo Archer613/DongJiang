@@ -9,7 +9,7 @@ import xs.utils._
 import Utils.FastArb._
 import Utils.IDConnector._
 
-class RnSlave(rnSlvId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slice = true, hasRCReq = false) {
+class RnSlave(rnSlvId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slice = true, hasDBRCReq = false) {
   val nodeParam = djparam.rnNodeMes(rnSlvId)
 
 // --------------------- IO declaration ------------------------//
@@ -66,10 +66,10 @@ class RnSlave(rnSlvId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slic
   rxDat.io.dataFDB <> io.dbSigs.dataFDB
   rxDat.io.dataFDBVal <> reqBuf.io.dataFDBVal
 
-  reqBuf.io.req2Slice <> io.req2Slice
-  reqBuf.io.resp2Node <> io.resp2Node
-  reqBuf.io.req2Node <> io.req2NodeOpt.get
-  reqBuf.io.resp2Slice <> io.resp2Sliceopt.get
+  reqBuf.io.req2Slice <> io.req2SliceOpt.get
+  reqBuf.io.resp2Node <> io.resp2NodeOpt.get
+  reqBuf.io.req2Node <> io.req2Node
+  reqBuf.io.resp2Slice <> io.resp2Slice
   reqBuf.io.wReq <> io.dbSigs.wReq
   reqBuf.io.wResp <> io.dbSigs.wResp
 }

@@ -24,7 +24,8 @@ case class RnNodeParam
     nrRnRxLcrdMax: Int = 4,
 ) {
     val isMaster = !isSlave
-
+    val hasReq2Slice = true
+    val hasDBRCReq = isMaster
     require(nrRnTxLcrdMax <= 15)
     require(nrRnRxLcrdMax <= 15)
 }
@@ -42,6 +43,8 @@ case class SnNodeParam
     nrSnRxLcrdMax: Int = 4,
 
 ) {
+    val hasReq2Slice = false
+    val hasDBRCReq = true // must be true when its master
     require(nrSnTxLcrdMax <= 15)
     require(nrSnRxLcrdMax <= 15)
 }
@@ -56,7 +59,8 @@ case class DJParam(
                     useInNoc: Boolean = false,
                     useDCT: Boolean = false, // Dont open it when useInNoc is false
                     // ------------------------- Rn / Sn Base Mes -------------------- //
-                    rnNodeMes: Seq[RnNodeParam] = Seq(RnNodeParam( name = "RnSalve_0" )),
+                    rnNodeMes: Seq[RnNodeParam] = Seq(RnNodeParam( name = "RnSalve_0" ),
+                                                      RnNodeParam( name = "RnMaster_0", isSlave = false)),
                     snNodeMes: Seq[SnNodeParam] = Seq(SnNodeParam( name = "SnMaster_0" ),
                                                       SnNodeParam( name = "SnMaster_1" )),
                     // ------------------------ Slice Base Mes ------------------ //
