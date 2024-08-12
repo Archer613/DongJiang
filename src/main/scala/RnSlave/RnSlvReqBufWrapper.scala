@@ -1,4 +1,4 @@
-package DONGJIANG.RNMASTER
+package DONGJIANG.RNSLAVE
 
 import DONGJIANG. _
 import DONGJIANG.CHI._
@@ -23,13 +23,13 @@ class ReqBufSelector(nrRnReqBuf: Int = 8)(implicit p: Parameters) extends DJModu
 }
 
 
-class ReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule {
-  val nodeParam = djparam.rnNodeMes(rnMasId)
+class RnSlvReqBufWrapper(rnSlvId: Int)(implicit p: Parameters) extends DJModule {
+  val nodeParam = djparam.rnNodeMes(rnSlvId)
 
 // --------------------- IO declaration ------------------------//
   val io = IO(new Bundle {
     // CHI
-    val chi           = CHIBundleDecoupled(chiParams)
+    val chi           = Flipped(CHIBundleDecoupled(chiParams))
     // slice ctrl signals
     val req2Slice     = Decoupled(new Req2SliceBundle())
     val resp2Node     = Flipped(Decoupled(new Resp2NodeBundle()))
@@ -41,14 +41,13 @@ class ReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule {
       val dbid        = UInt(dbIdBits.W)
     }))
     // slice DataBuffer signals
-    val dbRCReq       = Decoupled(new DBRCReq())
     val wReq          = Decoupled(new DBWReq())
     val wResp         = Flipped(Decoupled(new DBWResp()))
     val dataFDBVal    = Flipped(Valid(new ToIDBundle))
   })
 
 // --------------------- Modules declaration ------------------------//
-  def createReqBuf(id: Int) = { val reqBuf = Module(new ReqBuf(rnMasId, id)); reqBuf }
+  def createReqBuf(id: Int) = { val reqBuf = Module(new RnSlvReqBuf(rnSlvId, id)); reqBuf }
   val reqBufs               = (0 until nodeParam.nrReqBuf).map(i => createReqBuf(i))
   val reqSel                = Module(new ReqBufSelector(nodeParam.nrReqBuf))
 //  val nestCtl         = Module(new NestCtl()) // TODO: Nest Ctrl
@@ -73,33 +72,33 @@ class ReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule {
 
 
   /*
-   * connect io.chi.rx <-> reqBufs.chi.rx
+   * connect io.chi.tx <-> reqBufs.chi.tx
    */
   reqBufs.map(_.io.chi).zipWithIndex.foreach {
     case(reqBuf, i) =>
-      // rxsnp
-      reqBuf.rxsnp.valid  := io.chi.rxsnp.valid & reqSelId0 === i.U & canReceive0
-      reqBuf.rxsnp.bits   := io.chi.rxsnp.bits
-      // rxrsp
-      reqBuf.rxrsp.valid  := io.chi.rxrsp.valid & io.chi.rxrsp.bits.txnID === i.U
-      reqBuf.rxrsp.bits   := io.chi.rxrsp.bits
-      // rxdat
-      reqBuf.rxdat.valid  := io.chi.rxdat.valid & io.chi.rxdat.bits.txnID === i.U
-      reqBuf.rxdat.bits   := io.chi.rxdat.bits
+      // txreq
+      reqBuf.txreq.valid  := io.chi.txreq.valid & reqSelId1 === i.U & canReceive1
+      reqBuf.txreq.bits   := io.chi.txreq.bits
+      // txrsp
+      reqBuf.txrsp.valid  := io.chi.txrsp.valid & io.chi.txrsp.bits.txnID === i.U
+      reqBuf.txrsp.bits   := io.chi.txrsp.bits
+      // txdat
+      reqBuf.txdat.valid  := io.chi.txdat.valid & io.chi.txrsp.bits.txnID === i.U
+      reqBuf.txdat.bits   := io.chi.txdat.bits
   }
 
-  // Set io.chi.rx_xxx.ready value
-  io.chi.txreq.ready  := canReceive0
+  // Set io.chi.tx_xxx.ready value
+  io.chi.txreq.ready  := canReceive1
   io.chi.txrsp.ready  := true.B
   io.chi.txdat.ready  := true.B
 
 
   /*
-   * connect io.chi.tx <-> reqBufs.chi.tx
+   * connect io.chi.rx <-> reqBufs.chi.rx
    */
-  fastArbDec2Dec(reqBufs.map(_.io.chi.txreq), io.chi.txreq)
-  fastArbDec2Dec(reqBufs.map(_.io.chi.txrsp), io.chi.txrsp)
-  fastArbDec2Dec(reqBufs.map(_.io.chi.txdat), io.chi.txdat)
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxsnp), io.chi.rxsnp)
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxrsp), io.chi.rxrsp)
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxdat), io.chi.rxdat)
 
 
   /*
@@ -111,7 +110,6 @@ class ReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule {
   /*
    * Connect slice DataBuffer signals
    */
-  fastArbDec2Dec(reqBufs.map(_.io.dbRCReq), io.dbRCReq)
   fastArbDec2Dec(reqBufs.map(_.io.wReq), io.wReq)
   idSelDec2DecVec(io.wResp, reqBufs.map(_.io.wResp), level = 2)
   reqBufs.zipWithIndex.foreach{ case(reqBuf, i) => reqBuf.io.dataFDBVal := io.dataFDBVal.valid & io.dataFDBVal.bits.to.idL2 === i.U }
@@ -124,15 +122,15 @@ class ReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule {
   fastArbDec2Dec(reqBufs.map(_.io.resp2Slice), io.resp2Slice)
   reqBufs.zipWithIndex.foreach {
     case (reqBuf, i) =>
-      reqBuf.io.req2Node.valid := io.req2Node.valid & reqSelId1 === i.U & canReceive1
+      reqBuf.io.req2Node.valid := io.req2Node.valid & reqSelId0 === i.U & canReceive0
       reqBuf.io.req2Node.bits  := io.req2Node.bits
   }
-  io.req2Node.ready := canReceive1
+  io.req2Node.ready := canReceive0
 
 
 
 // --------------------- Assertion ------------------------------- //
-  assert(Mux(io.chi.rxrsp.valid, PopCount(reqBufs.map(_.io.chi.rxrsp.fire)) === 1.U, true.B))
-  assert(Mux(io.chi.rxdat.valid, PopCount(reqBufs.map(_.io.chi.rxdat.fire)) === 1.U, true.B))
+  assert(Mux(io.chi.txrsp.valid, PopCount(reqBufs.map(_.io.chi.txrsp.fire)) === 1.U, true.B))
+  assert(Mux(io.chi.txdat.valid, PopCount(reqBufs.map(_.io.chi.txdat.fire)) === 1.U, true.B))
 
 }

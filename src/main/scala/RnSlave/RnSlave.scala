@@ -31,7 +31,7 @@ class RnSlave(rnSlvId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slic
   val txDat   = Module(new ChiDatIn(nrReqBuf = nodeParam.nrReqBuf, aggregateIO = nodeParam.aggregateIO))
   val rxDat   = Module(new ChiDatOut(lcrdMax = nodeParam.nrRnRxLcrdMax, aggregateIO = nodeParam.aggregateIO))
 
-  val reqBuf  = Module(new ReqBufWrapper(rnSlvId))
+  val reqBuf  = Module(new RnSlvReqBufWrapper(rnSlvId))
 
 // ------------------------ Connection ---------------------------//
   chiCtrl.io.chiLinkCtrl <> chiIO.linkCtrl

@@ -34,7 +34,7 @@ class RBFSMState(implicit p: Parameters) extends Bundle {
 }
 
 
-class ReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModule {
+class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModule {
   val nodeParam = djparam.rnNodeMes(rnMasId)
 
 // --------------------- IO declaration ------------------------//
