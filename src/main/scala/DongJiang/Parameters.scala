@@ -168,7 +168,8 @@ trait HasDJParam {
         nodeIdBits = 7,
         addressBits = addressBits,
         dataBits = beatBits,
-        dataCheck = false
+        dataCheck = false,
+        snpHasTgtId = djparam.useInNoc
     )
 
     // some requirements
