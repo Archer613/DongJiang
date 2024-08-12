@@ -63,7 +63,8 @@ object CHIOp {
     def AtomicCompare         = 0x39.U(width.W)
     def PrefetchTgt           = 0x3A.U(width.W)
 
-    def isWrite(x: UInt) = WriteEvictFull <= x & x <= WriteUniquePtlStash
+    def isReadX(x: UInt)      = (ReadShared <= x & x <= ReadNoSnp) | x === ReadUnique | (ReadOnceCleanInvalid <= x & x <= ReadNotSharedDirty)
+    def isWriteX(x: UInt)     = WriteEvictFull <= x & x <= WriteUniquePtlStash
   }
 
   object RSP {
