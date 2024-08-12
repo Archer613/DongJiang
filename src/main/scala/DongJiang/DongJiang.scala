@@ -3,6 +3,7 @@ package DONGJIANG
 import DONGJIANG.CHI._
 import DONGJIANG.RNSLAVE._
 import DONGJIANG.RNMASTER._
+import DONGJIANG.SLICE._
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config._
@@ -35,7 +36,7 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
  *                       |       | ---> | Arbiter | ---> | MainPipe | ---> | Queue | ---> |  <---> | SNMASTER |
  *    ------------       |       |      -----------      ------------      ---------      |        ------------
  *    | RNMASTER | <---> | <---> |      |   DB    | <--> |    DS    |                     |
- *    ------------              -----------------------------------------------------------
+ *    ------------               ----------------------------------------------------------
  *                                                      Slice
  */
 
@@ -223,8 +224,12 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
     val rnSlaves    = (0 until nrRnSlv).map(i => createRnSlv(i))
     val rnMasters   = (nrRnSlv until nrRnNode).map(i => createRnMas(i))
     val rnNodes     = rnSlaves ++ rnMasters
+    val xbar        = Module(new RN2SliceXbar())
+    val slices      = Seq.fill(djparam.nrBank) { Module(new Slice()) }
 
-    rnNodes.foreach(_.io <> DontCare)
+    slices.foreach(_.io <> DontCare)
+    // TODO:
+    xbar.io.bankVal.foreach(_ := true.B)
 
 
 // ---------------------------------------------- Connection ---------------------------------------------------//
@@ -238,5 +243,46 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
     rnMasters.map(_.chiIO.linkCtrl).zip(io.rnMasChiLinkCtrl).foreach { case (a, b) => a <> b }
 
 
+    /*
+     * Connect RNs <-> Xbar
+     */
+    rnNodes.zipWithIndex.foreach {
+        case(rn, i) =>
+            // slice ctrl signals
+            if(djparam.rnNodeMes(i).hasReq2Slice) {
+                xbar.io.req2Slice.in(i)             <> rn.io.req2SliceOpt.get
+                xbar.io.resp2Node.out(i)            <> rn.io.resp2NodeOpt.get
+            } else {
+                xbar.io.req2Slice.in(i)             <> DontCare
+                xbar.io.resp2Node.out(i)            <> DontCare
+            }
+            xbar.io.req2Node.out(i)                 <> rn.io.req2Node
+            xbar.io.resp2Slice.in(i)                <> rn.io.resp2Slice
+            // slice DataBuffer signals
+            if (djparam.rnNodeMes(i).hasDBRCReq) {
+                xbar.io.dbSigs.in(i).dbRCReqOpt.get <> rn.io.dbSigs.dbRCReqOpt.get
+            } else {
+                xbar.io.dbSigs.in(i).dbRCReqOpt.get <> DontCare
+            }
+            xbar.io.dbSigs.in(i).wReq               <> rn.io.dbSigs.wReq
+            xbar.io.dbSigs.in(i).wResp              <> rn.io.dbSigs.wResp
+            xbar.io.dbSigs.in(i).dataFDB            <> rn.io.dbSigs.dataFDB
+            xbar.io.dbSigs.in(i).dataTDB            <> rn.io.dbSigs.dataTDB
+    }
+
+
+    /*
+     * Connect Slice <-> Xbar
+     */
+    slices.zipWithIndex.foreach {
+        case (slice, i) =>
+            // slice ctrl signals
+            xbar.io.req2Slice.out(i)    <> slice.io.rnReq2Slice
+            xbar.io.resp2Node.in(i)     <> slice.io.resp2RnNode
+            xbar.io.req2Node.in(i)      <> slice.io.req2RnNode
+            xbar.io.resp2Slice.out(i)   <> slice.io.rnResp2Slice
+            // slice DataBuffer signals
+            xbar.io.dbSigs.out(i)       <> slice.io.rnDBSigs
+    }
 
 }

@@ -132,6 +132,9 @@ class RnMasReqBufWrapper(rnMasId: Int)(implicit p: Parameters) extends DJModule 
 
 
 // --------------------- Assertion ------------------------------- //
+  assert(Mux(io.chi.rxsnp.valid, io.chi.rxsnp.bits.addr(addressBits - 1, addressBits - nodeParam.addressIdBits) === nodeParam.addressId.U, true.B))
+  assert(Mux(io.req2Node.valid, io.req2Node.bits.addr(addressBits - 1, addressBits - nodeParam.addressIdBits) === nodeParam.addressId.U, true.B))
+
   assert(Mux(io.chi.rxrsp.valid, PopCount(reqBufs.map(_.io.chi.rxrsp.fire)) === 1.U, true.B))
   assert(Mux(io.chi.rxdat.valid, PopCount(reqBufs.map(_.io.chi.rxdat.fire)) === 1.U, true.B))
 
