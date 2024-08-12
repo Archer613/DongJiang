@@ -7,7 +7,7 @@ import org.chipsalliance.cde.config._
 class InboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, aggregateIO: Boolean = false)(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val chi           = Flipped(CHIChannelIO(gen, aggregateIO))
-    val txState       = Input(UInt(LinkStates.width.W))
+    val linkState     = Input(UInt(LinkStates.width.W))
     val allLcrdRetrun = Output(Bool()) // Deactive Done
     val flit          = Decoupled(gen)
   })
@@ -32,7 +32,7 @@ class InboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, a
   /*
    * FSM
    */
-  switch(io.txState) {
+  switch(io.linkState) {
     is(LinkStates.STOP) {
       // Nothing to do
     }
@@ -74,7 +74,7 @@ class InboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, a
 
 
 // --------------------- Assertion ------------------------------- //
-  switch(io.txState) {
+  switch(io.linkState) {
     is(LinkStates.STOP) {
       assert(!io.chi.flitv, "When STOP, It cant send flit")
     }

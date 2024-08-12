@@ -6,9 +6,9 @@ import org.chipsalliance.cde.config._
 
 class OutboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, aggregateIO: Boolean = false)(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
-    val chi     = CHIChannelIO(gen, aggregateIO)
-    val rxState = Input(UInt(LinkStates.width.W))
-    val flit    = Flipped(Decoupled(gen))
+    val chi       = CHIChannelIO(gen, aggregateIO)
+    val linkState = Input(UInt(LinkStates.width.W))
+    val flit      = Flipped(Decoupled(gen))
   })
 
   val lcrdMaxBits   = log2Ceil(lcrdMax + 1)
@@ -27,7 +27,7 @@ class OutboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, 
   /*
    * Receive task and data
    */
-  when(io.rxState =/= LinkStates.DEACTIVATE) {
+  when(io.linkState =/= LinkStates.DEACTIVATE) {
     flitv := io.flit.fire
     flit  := io.flit.bits
   }.otherwise {
@@ -44,7 +44,7 @@ class OutboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, 
   /*
    * FSM: count free lcrd and set task ready value
    */
-  switch(io.rxState) {
+  switch(io.linkState) {
     is(LinkStates.STOP) {
       // Nothing to do
     }
@@ -71,7 +71,7 @@ class OutboundFlitCtrl[T <: Bundle with HasChiOpcode](gen: T, lcrdMax: Int = 4, 
 
 
 // ------------------------- Assert ------------------------------- //
-  switch(io.rxState) {
+  switch(io.linkState) {
     is(LinkStates.STOP) {
       assert(!io.chi.flitv, "When STOP, It cant send flit")
       assert(!io.chi.lcrdv,  "When DEACTIVATE, It cant receive lcrdv")
