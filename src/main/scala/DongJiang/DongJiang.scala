@@ -44,69 +44,83 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
 
 /*
  * System ID Map Table:
- * [Module]     |  [private ID]            |  [XBar ID]
+ * [Module]     |  [private ID]             |  [XBar ID]
+ *
+ * BASE Slice Ctrl Signals:
+ * [req2Slice]  |  [hasAddr]                |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ * [resp2Node]  |  [hasCHIChnl]             |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ * [req2Node]   |  [hasAddr]                |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ * [resp2Slice] |  [hasMSHRSet] [HasDBID]   |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ *
+ *
+ * BASE Slice DB Signals:
+ * [dbRCReq]    |  [hasMSHRSet] [hasDBID]   |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ * [wReq]       |                           |  from: [idL0]   [idL1]    [idL2]       | to: [idL0]     [idL1]    [idL2]
+ * [wResp]      |  [hasDBID]                |  from: [SLICE]  [sliceId] [DontCare]   | to: [idL0]     [idL1]    [idL2]
+ * [dataFDB]    |                           |  from: None                            | to: [idL0]     [idL1]    [idL2]
+ * [dataTDB]    |  [hasDBID]                |  from: None                            | to: [idL0]     [idL1]    [idL2]
  *
  * ****************************************************************************************************************************************************
  *
  * RnSlave <-> Slice Ctrl Signals:
- * [reqTSlice]  |  [hasAddr]               |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
- * [respFSlice] |  [hasAddr]   [hasWay]    |  from: None                            | to: [RNSLV]    [nodeId]  [reqBufId]
- * [reqFSlice]  |  [hasAddr]               |  from: [SLICE]  [sliceId] [SnpCtlId]   | to: [RNSLV]    [nodeId'] [DontCare]             // nodeId' reMap in Xbar
- * [respTSlice] |  [HasDBID]               |  from: None                            | to: [SLICE]    [sliceId] [SnpCtlId / DontCare]
+ * [req2Slice]  |  [hasAddr]                |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
+ * [resp2Node]  |  [hasCHIChnl]             |  from: [SLICE]  [sliceId] [mshrWay]    | to: [RNSLV]    [nodeId]  [reqBufId]
+ * [req2Node]   |  [hasAddr]                |  from: [SLICE]  [sliceId] [mshrWay]    | to: [RNSLV]    [nodeId]  [DontCare]
+ * [resp2Slice] |  [hasMSHRSet] [HasDBID]   |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [mshrWay]
  *
  *
  * RnSlave <-> Slice DB Signals:
- * [wReq]       |  [None]                  |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
- * [wResp]      |  [hasDBID]               |  from: [SLICE]  [sliceId] [DontCare]   | to: [RNSLV]    [nodeId]  [reqBufId]
- * [dataFDB]    |  [None]                  |  from: None                            | to: [RNSLV]    [nodeId]  [reqBufId]
- * [dataTDB]    |  [hasDBID]               |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
+ * [wReq]       |                           |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
+ * [wResp]      |  [hasDBID]                |  from: [SLICE]  [sliceId] [DontCare]   | to: [RNSLV]    [nodeId]  [reqBufId]
+ * [dataFDB]    |                           |  from: None                            | to: [RNSLV]    [nodeId]  [reqBufId]
+ * [dataTDB]    |  [hasDBID]                |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
  *
  * ****************************************************************************************************************************************************
  *
  * RnMaster <-> Slice Ctrl Signals:
- * [reqTSlice]  |  [hasAddr]               |  from: [RNMAS]  [nodeId] [reqBufId]    | to: [SLICE]    [sliceId] [DontCare]
- * [respFSlice] |  [hasAddr]   [hasWay]    |  from: None                            | to: [RNMAS]    [nodeId]  [reqBufId]
- * [reqFSlice]  |  [hasAddr]   [hasWay]    |  from: [SLICE]  [sliceId] [SnpCtlId]   | to: [RNMAS]    [nodeId]  [DontCare]
- * [updTSlice]  |  [hasSet]    [hasWay]    |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
- *              |  [HasDBID]               |
+ * [req2Slice]  |  [hasAddr]                |  from: [RNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
+ * [resp2Node]  |  [hasCHIChnl]             |  from: [SLICE]  [sliceId] [mshrWay]    | to: [RNMAS]    [nodeId]  [reqBufId]
+ * [req2Node]   |  [hasAddr]                |  from: [SLICE]  [sliceId] [mshrWay]    | to: [RNMAS]    [nodeId]  [DontCare]
+ * [resp2Slice] |  [hasMSHRSet] [HasDBID]   |  from: [RNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [mshrWay]
  *
  *
- * RnMaster <-> Slice DB Signals:(Same as RnSlave expect dbRCReq)
- * [dbRCReq]    |  [hasDBID]               |  from: [RNMAS]  [nodeId]   [reqBufId]  | to: [SLICE]    [sliceId] [DontCare]
- * [wReq]       |  [None]                  |  from: [RNMAS]  [nodeId]   [reqBufId]  | to: [SLICE]    [sliceId] [DontCare]
- * [wResp]      |  [hasDBID]               |  from: [SLICE]  [sliceId]  [DontCare]  | to: [RN]       [nodeId]  [reqBufId]
- * [dataFDB]    |  [None]                  |  from: None                            | to: [RN]       [nodeId]  [reqBufId]
- * [dataTDB]    |  [hasDBID]               |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
+ * RnMaster <-> Slice DB Signals:
+ * [dbRCReq]    |  [hasMSHRSet] [hasDBID]   |  from: [RNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [mshrWay]    // When Data from DS use mshrId(Cat(Set, way))
+ * [wReq]       |                           |  from: [RNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
+ * [wResp]      |  [hasDBID]                |  from: [SLICE]  [sliceId] [DontCare]   | to: [RNMAS]    [nodeId]  [reqBufId]
+ * [dataFDB]    |                           |  from: None                            | to: [RNMAS]    [nodeId]  [reqBufId]
+ * [dataTDB]    |  [hasDBID]                |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
  *
  * ****************************************************************************************************************************************************
  *
  * Slice <-> SnMaster Ctrl Signals:
- * [reqFSlice]  |  [hasAddr]   [hasWay]    |  from: None                            | to: None
- * [updTSlice]  |  [hasSet]    [hasWay]    |  from: None                            | to: None
+ * [req2Node]   |  [hasAddr]                |  from: [SLICE]  [sliceId] [mshrWay]    | to: [SNMAS]    [nodeId]  [DontCare]
+ * [resp2Slice] |  [hasMSHRSet] [HasDBID]   |  from: [RNSLV]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [mshrWay]
  *
  *
  * Slice <-> SnMaster DB Signals:
- * [wReq]       |  [hasRCID]               |  from: None                            | to: None
- * [wResp]      |  [hasDBID]   [hasRCID]   |  from: None                            | to: None
- * [dataFDB]    |  [hasSet]    [hasWay]    |  from: None                            | to: None
- * [dataTDB]    |  [hasDBID]               |  from: None                            | to: None
+ * [dbRCReq]    |  [hasMSHRSet] [hasDBID]   |  from: [SNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [mshrWay]   // When Data from DS use mshrId(Cat(Set, way))
+ * [wReq]       |                           |  from: [SNMAS]  [nodeId]  [reqBufId]   | to: [SLICE]    [sliceId] [DontCare]
+ * [wResp]      |  [hasDBID]                |  from: [SLICE]  [sliceId] [DontCare]   | to: [RNMAS]    [nodeId]  [reqBufId]  // Unuse from
+ * [dataFDB]    |                           |  from: None                            | to: [RNMAS]    [nodeId]  [reqBufId]
+ * [dataTDB]    |  [hasDBID]                |  from: None                            | to: [SLICE]    [sliceId] [DontCare]
  *
  * ****************************************************************************************************************************************************
  *
  * MainPipe S4 Commit <-> DB Signals:
- * [dbRCReq]    |                                     |  from: None                 | to: [RNSLV/RNMAS]         [nodeId]  [reqBufId]
+ * [dbRCReq]    |  [hasMSHRSet] [hasDBID]   |  from: [SLICE]  [sliceId] [DontCare]   | to: [NODE]     [nodeId]  [reqBufId] // Unuse mshrSet
  *
  *
  * MainPipe S4 Commit <-> DS Signals:
- * [dsRWReq]    |  [hasSet]    [hasWay]   [hasDSID]   |  from: None                 | to: [RNSLV/RNMAS]         [nodeId]  [reqBufId]
+ * [dsRWReq]    |  [hasMSHRSet] [hasDBID]   |  from: [SLICE]  [sliceId] [mshrWay]    | to: [NODE]     [nodeId]  [reqBufId]
  *
  *
  * DS <-> DB Signals:
- * [dbRCReq]    |  [hasSet]    [hasWay]   [hasDSID]   |  from: None                 | to: [RNSLV/RNMAS/SNMAS]   [nodeId]  [reqBufId] // Go to SN use Set and Way; Go to RN use to; Go to DS use DSID
- * [wReq]       |  [None]      [hasDSID]              |  from: None                 | to: None
- * [wResp]      |  [hasDBID]   [hasDSID]              |  from: None                 | to: None
- * [dataFDB]    |  [hasDSID]                          |  from: None                 | to: None
- * [dataTDB]    |  [hasDBID]                          |  from: None                 | to: None
+ * [dbRCReq]    |  [hasMSHRSet] [hasDBID]   |  from: [SLICE]  [sliceId] [dsId]       | to: [NODE]     [nodeId]  [reqBufId]  // Unuse mshrSet
+ * [wReq]       |                           |  from: [SLICE]  [sliceId] [dsId]       | to: [SLICE]    [sliceId] [DontCare]
+ * [wResp]      |  [hasDBID]                |  from: [SLICE]  [sliceId] [DontCare]   | to: [SLICE]    [sliceId] [dsId]      // Unuse from
+ * [dataFDB]    |                           |  from: None                            | to: [SLICE]    [sliceId] [dsId]
+ * [dataTDB]    |  [hasDBID]                |  from: None                            | to: [SLICE]    [sliceId] [mshrWay]
  *
  */
 
@@ -124,15 +138,15 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
  *
  *
  *
- * { Read / Dataless / Atomic / CMO }   TxReq: Store { TgtID_g = TgtID    |  SrcID_g = SrcID     |   TxnID_g = TxnID     |                      }
+ * { Read / Dataless / Atomic / CMO }   TxReq: Store {                    |  SrcID_g = SrcID     |   TxnID_g = TxnID     |                      }
  * { CompAck                        }   TxRsp: Match {                    |                      |   TxnID  == reqBufId  |                      }
- * { CompData                       }   RxDat: Send  { TgtID   = SrcID_g  |  SrcID   = TgtID_g   |   TxnID   = TxnID_g   |  DBID    = reqBufId  }
- * { Comp                           }   RxRsp: Send  { TgtID   = SrcID_g  |  SrcID   = TgtID_g   |   TxnID   = TxnID_g   |                      }
+ * { CompData                       }   RxDat: Send  { TgtID   = SrcID_g  |  SrcID   = nodeID    |   TxnID   = TxnID_g   |  DBID    = reqBufId  }
+ * { Comp                           }   RxRsp: Send  { TgtID   = SrcID_g  |  SrcID   = nodeID    |   TxnID   = TxnID_g   |  DBID    = reqBufId  }
  *
  *
- * { Write                          }   TxReq: Store { TgtID_g = TgtID    |  SrcID_g = SrcID     |   TxnID_g = TxnID     |                      }
+ * { Write                          }   TxReq: Store {                    |  SrcID_g = SrcID     |   TxnID_g = TxnID     |                      }
  * { WriteData                      }   TxDat: Match {                    |                      |   TxnID  == reqBufId  |                      }
- * { CompDBIDResp                   }   RxRsp: Send  { TgtID   = SrcID_g  |  SrcID   = TgtID_g   |   TxnID   = TxnID_g   |  DBID    = reqBufId  }
+ * { CompDBIDResp                   }   RxRsp: Send  { TgtID   = SrcID_g  |  SrcID   = nodeID    |   TxnID   = TxnID_g   |  DBID    = reqBufId  }
  *
  *
  * { SnoopResp                      }   TxRsp: Match {                    |                      |   TxnID  == reqBufId  |                      }
@@ -154,9 +168,10 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
  *
  *
  * { Read / Dataless / Atomic / CMO }   TxReq: Send  { TgtID = tgtNodeID  |  SrcID   = nodeID    |   TxnID   = reqBufId  |                      }
- * { CompAck                        }   TxRsp: Send  { TgtID = HomeNID_g  |  SrcID   = nodeID    |   TxnID   = DBID_g    |                      }
+ * { CompAck(When get CompData)     }   TxRsp: Send  { TgtID = HomeNID_g  |  SrcID   = nodeID    |   TxnID   = DBID_g    |                      }
+ * { CompAck(When get Comp)         }   TxRsp: Send  { TgtID = SrcID_g    |  SrcID   = nodeID    |   TxnID   = DBID_g    |                      }
  * { CompData                       }   RxDat: M & S {                    |                      |   TxnID  == reqBufId  |  DBID_g  = DBID      |   HomeNID_g   = HomeNID   }
- * { Comp                           }   RxRsp: Match {                    |                      |   TxnID   = reqBufId  |  DBID_g  = DBID      |   HomeNID_g   = SrcID     }
+ * { Comp                           }   RxRsp: M & S {                    |  SrcID_g = SrcID     |   TxnID  == reqBufId  |  DBID_g  = DBID      }
  *
  *
  * { Write                          }   TxReq: Send  { TgtID = tgtNodeID  |  SrcID   = nodeID    |   TxnID   = reqBufId  |                      }
