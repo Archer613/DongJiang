@@ -27,6 +27,7 @@ class ChiDatIn(nrReqBuf: Int, aggregateIO: Boolean)(implicit p: Parameters) exte
 // ------------------- Reg/Wire declaration ---------------------- //
   val flit    = Wire(Decoupled(new CHIBundleDAT(chiParams)))
   val selBuf  = Wire(new Bundle { val bankId = UInt(bankBits.W); val dbid = UInt(dbIdBits.W) })
+  val alreadySendFlitReg = RegInit(false.B)
 
 
 // --------------------- Logic ----------------------------------- //
@@ -41,9 +42,11 @@ class ChiDatIn(nrReqBuf: Int, aggregateIO: Boolean)(implicit p: Parameters) exte
   /*
    * Connect io.flit
    */
-  io.flit.valid     := flit.fire
-  io.flit.bits      := flit.bits
-  io.flit.bits.data := DontCare
+  io.flit.valid       := flit.valid & !alreadySendFlitReg
+  io.flit.bits        := flit.bits
+  io.flit.bits.data   := DontCare
+
+  alreadySendFlitReg  := Mux(io.dataTDB.fire, false.B, Mux(alreadySendFlitReg, alreadySendFlitReg, io.flit.fire))
 
   /*
    * Select reqBuf bankId and dbid
@@ -58,7 +61,7 @@ class ChiDatIn(nrReqBuf: Int, aggregateIO: Boolean)(implicit p: Parameters) exte
   io.dataTDB.bits.data      := io.flit.bits.data
   io.dataTDB.bits.dataID    := io.flit.bits.dataID
   io.dataTDB.bits.dbid      := selBuf.dbid
-  io.dataTDB.bits.to.idL0   := SLICE
+  io.dataTDB.bits.to.idL0   := IdL0.SLICE
   io.dataTDB.bits.to.idL1   := selBuf.bankId
   io.dataTDB.bits.to.idL2   := DontCare
 

@@ -16,23 +16,23 @@ class ChiDatOut(lcrdMax: Int, aggregateIO: Boolean)(implicit p: Parameters) exte
   })
 
 // --------------------- Modules declaration --------------------- //
-  val rxDat   = Module(new OutboundFlitCtrl(gen = new CHIBundleDAT(chiParams), lcrdMax = lcrdMax, aggregateIO))
+  val chiDat  = Module(new OutboundFlitCtrl(gen = new CHIBundleDAT(chiParams), lcrdMax = lcrdMax, aggregateIO))
 
 
 // ------------------- Reg/Wire declaration ---------------------- //
   val flit    = Wire(Decoupled(new CHIBundleDAT(chiParams)))
-
+  val alreadySendFDBValReg = RegInit(false.B)
 
 // --------------------- Logic ----------------------------------- //
   /*
    * Connect txDat
    */
-  rxDat.io.linkState        := io.linkState
-  rxDat.io.chi              <> io.chi
-  rxDat.io.flit             <> flit
-  rxDat.io.flit.bits.data   := io.dataFDB.bits.data
-  rxDat.io.flit.bits.dataID := io.dataFDB.bits.dataID
-  rxDat.io.flit.bits.be     := Fill(rxDat.flit.be.getWidth, 1.U(1.W))
+  chiDat.io.linkState         := io.linkState
+  chiDat.io.chi               <> io.chi
+  chiDat.io.flit              <> flit
+  chiDat.io.flit.bits.data    := io.dataFDB.bits.data
+  chiDat.io.flit.bits.dataID  := io.dataFDB.bits.dataID
+  chiDat.io.flit.bits.be      := Fill(chiDat.flit.be.getWidth, 1.U(1.W))
 
   /*
    * Set flit value
@@ -47,10 +47,10 @@ class ChiDatOut(lcrdMax: Int, aggregateIO: Boolean)(implicit p: Parameters) exte
   /*
    * Set dataFDBVal Value
    */
-  io.dataFDBVal.valid := io.dataFDB.valid
+  io.dataFDBVal.valid   := io.dataFDB.valid & !alreadySendFDBValReg
   io.dataFDBVal.bits.to := io.dataFDB.bits.to
 
-
+  alreadySendFDBValReg  := Mux(flit.fire, false.B, Mux(alreadySendFDBValReg, alreadySendFDBValReg, io.dataFDBVal.valid))
 
 // --------------------- Assertion ------------------------------- //
   assert(!io.flit.valid | io.flit.ready)
