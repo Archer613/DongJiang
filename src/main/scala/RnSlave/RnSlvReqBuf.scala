@@ -275,7 +275,7 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   if (djparam.useDCT) io.req2Slice.bits.txnIDOpt.get := reqReg.txnId
   // IdMap
   io.req2Slice.bits.to.idL0     := SLICE
-  io.req2Slice.bits.to.idL1     := DontCare // Remap in Xbar
+  io.req2Slice.bits.to.idL1     := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.req2Slice.bits.to.idL2     := DontCare
   io.req2Slice.bits.from.idL0   := RNSLV
   io.req2Slice.bits.from.idL1   := rnSlvId.U
@@ -311,7 +311,7 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.wReq.valid           := fsmReg.s_getDBID
   // IdMap
   io.wReq.bits.to.idL0    := SLICE
-  io.wReq.bits.to.idL1    := DontCare // Remap in Xbar
+  io.wReq.bits.to.idL1    := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.wReq.bits.to.idL2    := DontCare
   io.wReq.bits.from.idL0  := RNSLV
   io.wReq.bits.from.idL1  := rnSlvId.U
@@ -350,8 +350,8 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.chi.txreq.ready  := true.B
   io.chi.txrsp.ready  := true.B
   io.chi.txdat.ready  := true.B
-  io.req2Node.ready  := true.B
-  io.resp2Node.ready := true.B
+  io.req2Node.ready   := true.B
+  io.resp2Node.ready  := true.B
   io.wResp.ready      := true.B
 
 
@@ -377,7 +377,7 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
     assert(fsmReg.asUInt === 0.U, "when ReqBuf release, all task should be done")
   }
   assert(Mux(getDBNumReg === nrBeat.U, !io.dataFDBVal, true.B), "ReqBuf get data from DataBuf overflow")
-  assert(Mux(io.dataFDBVal, fsmReg.s_resp & fsmReg.w_dbData, true.B), "When dbDataValid, ReqBuf should set s_resp and w_data")
+  assert(Mux(io.dataFDBVal, fsmReg.s_resp & fsmReg.w_dbData, true.B), "When dbDataValid, ReqBuf should set s_resp and w_dbData")
   assert(Mux(io.dataFDBVal, !fsmReg.w_mpResp, true.B), "When dataFDBVal, ReqBuf should has been receive mpResp")
 
   assert(Mux(fsmReg.w_snpResp & io.chi.txrsp.fire, !io.chi.txrsp.bits.resp(2), true.B))

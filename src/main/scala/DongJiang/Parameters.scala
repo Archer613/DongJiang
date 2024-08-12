@@ -195,6 +195,7 @@ trait HasDJParam {
             require(sSetBits + sDirBankBits > mshrSetBits)
             tag := tag_(sSetBits + sDirBankBits - 1 - mshrSetBits, 0)
         }
+        // return: [3:mshrTag] [2:mshrSet] [1:bank]
         (tag, set, bank)
     }
 

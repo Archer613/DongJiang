@@ -176,7 +176,7 @@ trait HasDBData extends DJBundle { this: Bundle =>
 }
 
 // DataBuffer Read/Clean Req
-class DBRCReq(implicit p: Parameters)       extends DJBundle with HasDBRCOp with HasMSHRSet with HasDBID with HasIDBits
+class DBRCReq(implicit p: Parameters)       extends DJBundle with HasDBRCOp with HasMSHRSet with HasDBID with HasIDBits { val useDBID = Bool()}
 class DBWReq(implicit p: Parameters)        extends DJBundle                                             with HasIDBits
 class DBWResp(implicit p: Parameters)       extends DJBundle                                with HasDBID with HasIDBits
 class NodeFDBData(implicit p: Parameters)   extends DJBundle with HasDBData                              with HasToIDBits

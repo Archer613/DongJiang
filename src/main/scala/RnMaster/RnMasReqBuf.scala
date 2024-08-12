@@ -88,8 +88,9 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   val getAllData        = WireInit(false.B) // get all Data from DataBuffer or TxDat
   val dbidReg           = RegInit(0.U(dbIdBits.W))
   val dbidBankIdReg     = RegInit(0.U(dbIdBits.W)) // dbid from which bank
-  val sendTxDatNumReq   = RegInit(0.U(log2Ceil(nrBeat + 1).W))
-  val sendAllData       = WireInit(false.B) // get all Data to HN
+  val sendTxDatNumReg   = RegInit(0.U(log2Ceil(nrBeat * 2 + 1).W))
+  val reqSendAllData    = WireInit(false.B) // Send all Data to HN when need to send CompData / WriteData
+  val snpSendAllData    = WireInit(false.B) // Send all Data to HN when need to send SnpRespData
   // req resp to slice req
   val reqRespReg        = RegInit(0.U(3.W))
   val reqRespHasDataReg = RegInit(false.B)
@@ -144,7 +145,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
      * Commmon
      */
     fsmReg.s_req      := Mux(io.req2Slice.fire,                 false.B, fsmReg.s_req)
-    fsmReg.s_data     := Mux(io.chi.txdat.fire & sendAllData,   false.B, fsmReg.s_data)
+    fsmReg.s_data     := Mux(io.chi.txdat.fire & reqSendAllData,false.B, fsmReg.s_data)
     fsmReg.s_rcDB     := Mux(io.dbRCReq.fire,                   false.B, fsmReg.s_rcDB)
     fsmReg.w_dbData   := Mux(io.dataFDBVal & getAllData,        false.B, fsmReg.w_dbData)
 
@@ -168,8 +169,8 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
      * Must send CompData before SnpRespData in DCT
      */
     fsmReg.s_snp2mshr := Mux(io.req2Node.fire,                 false.B, fsmReg.s_snp2mshr)
-    fsmReg.s_snpResp  := Mux((io.chi.txrsp.fire | (io.chi.txdat.fire & sendAllData)) & !fsmReg.s_data, false.B, fsmReg.s_snpResp)
-    fsmReg.w_mpResp   := Mux(io.resp2Node.fire,                false.B, fsmReg.w_mpResp)
+    fsmReg.s_snpResp  := Mux(io.chi.txrsp.fire | (io.chi.txdat.fire & snpSendAllData), false.B, fsmReg.s_snpResp)
+    fsmReg.w_mpResp   := Mux(io.resp2Node.fire,                 false.B, fsmReg.w_mpResp)
     fsmReg.s_snpUdpMSHR := Mux(io.resp2Slice.fire,              false.B, fsmReg.s_snpUdpMSHR)
   }
 
@@ -271,6 +272,15 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.chi.txdat.bits.resp    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  mpRespReg.resp,     mpRespReg.fwdStateOpt.getOrElse(0.U)), mpRespReg.resp)
   io.chi.txdat.bits.fwdState := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp, DontCare,           DontCare),                mpRespReg.fwdStateOpt.getOrElse(0.U))
   io.chi.txdat.bits.dbID    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  DontCare,           reqReg.txnId),            DontCare)
+  // Count
+  sendTxDatNumReg           := Mux(release, 0.U, sendTxDatNumReg + io.chi.txdat.fire)
+  reqSendAllData            := sendTxDatNumReg === nrBeat.U       | (sendTxDatNumReg === (nrBeat - 1).U & io.chi.txdat.fire)
+  when(CHIOp.SNP.isSnpXFwd(reqReg.opcode)){
+    snpSendAllData          := sendTxDatNumReg === (nrBeat * 2).U | (sendTxDatNumReg === (nrBeat * 2 - 1).U & io.chi.txdat.fire)
+  }.otherwise{
+    snpSendAllData          := sendTxDatNumReg === nrBeat.U       | (sendTxDatNumReg === (nrBeat - 1).U & io.chi.txdat.fire)
+  }
+
 
 
 // ---------------------------  Receive resp2Node / Send req2Slice and resp2Slice --------------------------------//
@@ -291,7 +301,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   if (djparam.useDCT) io.req2Slice.bits.txnIDOpt.get := reqReg.txnId
   // IdMap
   io.req2Slice.bits.to.idL0     := SLICE
-  io.req2Slice.bits.to.idL1     := DontCare // Remap in Xbar
+  io.req2Slice.bits.to.idL1     := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.req2Slice.bits.to.idL2     := DontCare
   io.req2Slice.bits.from.idL0   := RNSLV
   io.req2Slice.bits.from.idL1   := rnMasId.U
@@ -328,7 +338,9 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.dbRCReq.bits.from.idL0 := RNSLV
   io.dbRCReq.bits.from.idL1 := rnMasId.U
   io.dbRCReq.bits.from.idL2 := reqBufId.U
-//  io.dbRCReq.bits.dbid      := //TODO
+  io.dbRCReq.bits.mshrSet   := parseMSHRAddress(reqReg.addr)._2
+  io.dbRCReq.bits.dbid      := DontCare
+  io.dbRCReq.bits.useDBID   := false.B
 
 
 
@@ -338,7 +350,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.wReq.valid           := fsmReg.s_getDBID
   // IdMap
   io.wReq.bits.to.idL0    := SLICE
-  io.wReq.bits.to.idL1    := DontCare // Remap in Xbar
+  io.wReq.bits.to.idL1    := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.wReq.bits.to.idL2    := DontCare
   io.wReq.bits.from.idL0  := RNSLV
   io.wReq.bits.from.idL1  := rnMasId.U
@@ -356,9 +368,63 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   getDBNumReg   := Mux(release, 0.U, getDBNumReg + io.dataFDBVal.asUInt)
 
 
+// ---------------------------  Other Signals  --------------------------------//
+  /*
+   * getAllData logic
+   */
+  getAllData :=                                         getRxDatNumReg === nrBeat.U     | (getRxDatNumReg === (nrBeat - 1).U & io.chi.rxdat.fire) | //get data from rxdat
+                Mux(CHIOp.SNP.isSnpXFwd(reqReg.opcode), getDBNumReg === nrBeat.U        | (getDBNumReg === (nrBeat - 1).U & io.dataFDBVal),         //get data from db without fwd
+                                                        getDBNumReg === (nrBeat * 2).U  | (getDBNumReg === (nrBeat * 2 - 1).U & io.dataFDBVal))     //get data from db with fwd
+
+  /*
+   * Output reqBufDBID
+   */
+  io.reqBufDBID.valid := fsmReg.w_hnResp & !fsmReg.w_dbid
+  io.reqBufDBID.bits.dbid := dbidReg
+  io.reqBufDBID.bits.bankId := dbidBankIdReg
+
+  /*
+   * Set io ready value
+   */
+  io.chi.rxsnp.ready := true.B
+  io.chi.rxrsp.ready := true.B
+  io.chi.rxdat.ready := true.B
+  io.req2Node.ready  := true.B
+  io.resp2Node.ready := true.B
+  io.wResp.ready     := true.B
 
 
+  // ---------------------------  Assertion  --------------------------------//
+  // when it is free, it can receive or send mes
+  assert(Mux(io.free, !io.chi.txreq.valid, true.B))
+  assert(Mux(io.free, !io.chi.txrsp.valid, true.B))
+  assert(Mux(io.free, !io.chi.txdat.valid, true.B))
+  assert(Mux(io.free, !io.chi.rxdat.valid, true.B))
+  assert(Mux(io.free, !io.chi.rxrsp.valid, true.B))
+  assert(Mux(io.free, !io.req2Slice.valid, true.B))
+  assert(Mux(io.free, !io.resp2Node.valid, true.B))
+  assert(Mux(io.free, !io.resp2Slice.valid, true.B))
+  assert(Mux(io.free, !io.reqBufDBID.valid, true.B))
+  assert(Mux(io.free, !io.dbRCReq.valid, true.B))
+  assert(Mux(io.free, !io.wReq.valid, true.B))
+  assert(Mux(io.free, !io.wResp.valid, true.B))
+  assert(Mux(io.free, !io.dataFDBVal, true.B))
 
+  assert(Mux(!freeReg, !(io.chi.rxsnp.valid | io.req2Node.valid), true.B), "When ReqBuf valid, it cant input new req")
+  assert(Mux(io.chi.rxsnp.valid | io.req2Node.valid, io.free, true.B), "Reqbuf cant block req input")
+  assert(!(io.chi.rxsnp.valid & io.req2Node.valid), "Reqbuf cant receive rxsnp and reqTask at the same time")
+  when(release) {
+    assert(fsmReg.asUInt === 0.U, "when ReqBuf release, all task should be done")
+  }
+  assert(Mux(getDBNumReg === (nrBeat * 2).U, !io.dataFDBVal, true.B), "ReqBuf get data from DataBuf overflow")
+  assert(Mux(io.dataFDBVal, fsmReg.s_data & fsmReg.w_dbData, true.B), "When dbDataValid, ReqBuf should set s_data and w_dbData")
+  assert(Mux(io.dataFDBVal, !fsmReg.w_mpResp, true.B), "When dataFDBVal, ReqBuf should has been receive mpResp")
+
+  assert(Mux(fsmReg.s_snpResp & io.chi.rxrsp.fire, !io.chi.rxrsp.bits.resp(2), true.B))
+
+  val cntReg = RegInit(0.U(64.W))
+  cntReg := Mux(io.free, 0.U, cntReg + 1.U)
+  assert(cntReg < TIMEOUT_RB.U, "REQBUF[0x%x] ADDR[0x%x] OP[0x%x] SNP[0x%x] TIMEOUT", reqBufId.U, reqReg.addr, reqReg.opcode, reqReg.from.isSLICE.asUInt)
 
 
 
