@@ -36,18 +36,18 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
     // CHI
     val chi           = Flipped(CHIBundleDecoupled(chiParams))
     // slice ctrl signals
-    val reqTSlice     = Decoupled(new RnReqOutBundle())
-    val respFSlice    = Flipped(Decoupled(new RnRespInBundle()))
-    val reqFSlice     = Flipped(Decoupled(new RnReqInBundle()))
-    val respTSlice    = Decoupled(new RnRespOutBundle())
+    val req2Slice     = Decoupled(new Req2SliceBundle())
+    val resp2Node     = Flipped(Decoupled(new Resp2NodeBundle()))
+    val req2Node      = Flipped(Decoupled(new Req2NodeBundle()))
+    val resp2Slice    = Decoupled(new Resp2SliceBundle())
     // For txDat and rxDat sinasl
     val reqBufDBID    = Valid(new Bundle {
       val bankId      = UInt(bankBits.W)
       val dbid        = UInt(dbIdBits.W)
     })
     // slice DataBuffer signals
-    val wReq          = Decoupled(new RnDBWReq())
-    val wResp         = Flipped(Decoupled(new RnDBWResp()))
+    val wReq          = Decoupled(new DBWReq())
+    val wResp         = Flipped(Decoupled(new DBWResp()))
     val dataFDBVal    = Input(Bool())
   })
 
@@ -59,11 +59,12 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
     val txnId           = UInt(chiParams.txnidBits.W)
     val srcId           = UInt(chiParams.nodeIdBits.W)
     // Snp Mes
+    val tgtIdOpt        = if (djparam.useInNoc) Some(UInt(chiParams.nodeIdBits.W)) else None
     val retToSrc        = Bool()
     val doNotGoToSD     = Bool()
   }))
   // req from slice or txreq
-  val reqFSlice         = WireInit(0.U.asTypeOf(reqReg))
+  val req2Node          = WireInit(0.U.asTypeOf(reqReg))
   val reqFTxReq         = WireInit(0.U.asTypeOf(reqReg))
   val reqIsWrite        = WireInit(false.B)
   // reqBuf Ctrl
@@ -78,8 +79,9 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
   // snoop resp reg
   val snpRespReg        = RegInit(0.U(3.W))
   val snpRespHasDataReg = RegInit(false.B)
+  val snpFwdStateRegOpt = if (djparam.useDCT) Some(RegInit(0.U(3.W))) else None
   // slice resp reg
-  val sliceRespReg      = RegInit(0.U.asTypeOf(new RnRespInBundle()))
+  val mpRespReg         = RegInit(0.U.asTypeOf(new Resp2NodeBundle()))
 
 
 
@@ -87,7 +89,7 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
   /*
    * ReqBuf release logic
    */
-  val alloc   = io.reqFSlice.fire | io.chi.txreq.fire
+  val alloc   = io.req2Node.fire | io.chi.txreq.fire
   val release = fsmReg.asUInt === 0.U // all s_task / w_task done
   freeReg     := Mux(release & !alloc, true.B, Mux(alloc, false.B, freeReg))
   io.free     := freeReg
@@ -112,21 +114,21 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
     // wait
     fsmReg.w_mpResp   := true.B
     fsmReg.w_compAck  := io.chi.txreq.bits.expCompAck
-  }.elsewhen(io.reqFSlice.fire) {
+  }.elsewhen(io.req2Node.fire) {
     // send
     fsmReg.s_snp      := true.B
     fsmReg.s_snpResp  := true.B
-    fsmReg.s_getDBID  := io.reqFSlice.bits.retToSrc
+    fsmReg.s_getDBID  := io.req2Node.bits.retToSrc
     // wait
     fsmReg.w_snpResp  := true.B
-    fsmReg.w_rnData   := io.reqFSlice.bits.retToSrc
-    fsmReg.w_dbid     := io.reqFSlice.bits.retToSrc
+    fsmReg.w_rnData   := io.req2Node.bits.retToSrc
+    fsmReg.w_dbid     := io.req2Node.bits.retToSrc
   }.otherwise {
     /*
      * Common
      */
     // send
-    fsmReg.s_req2mshr := Mux(io.reqTSlice.fire, false.B, fsmReg.s_req2mshr)
+    fsmReg.s_req2mshr := Mux(io.req2Slice.fire, false.B, fsmReg.s_req2mshr)
     fsmReg.s_getDBID  := Mux(io.wReq.fire, false.B, fsmReg.s_getDBID)
     // wait
     fsmReg.w_dbid     := Mux(io.wResp.fire, false.B, fsmReg.w_dbid)
@@ -137,10 +139,10 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
      */
     // send
     fsmReg.s_resp     := Mux(io.chi.rxrsp.fire | (io.chi.rxdat.fire & getAllData), false.B, fsmReg.s_resp)
-    fsmReg.s_udpMSHR  := Mux(io.respTSlice.fire, false.B, fsmReg.s_udpMSHR)
+    fsmReg.s_udpMSHR  := Mux(io.resp2Slice.fire, false.B, fsmReg.s_udpMSHR)
     // wait
-    fsmReg.w_mpResp   := Mux(io.respFSlice.fire, false.B, fsmReg.w_mpResp)
-    fsmReg.w_dbData   := Mux(io.respFSlice.fire & io.respFSlice.bits.isRxDat, true.B, Mux(getAllData, false.B, fsmReg.w_dbData))
+    fsmReg.w_mpResp   := Mux(io.resp2Node.fire, false.B, fsmReg.w_mpResp)
+    fsmReg.w_dbData   := Mux(io.resp2Node.fire & io.resp2Node.bits.isRxDat, true.B, Mux(getAllData, false.B, fsmReg.w_dbData))
     fsmReg.w_compAck  := Mux(io.chi.txrsp.fire & io.chi.txrsp.bits.opcode === CHIOp.RSP.CompAck, false.B, fsmReg.w_compAck)
 
     /*
@@ -154,36 +156,38 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
      */
     // send
     fsmReg.s_snp      := Mux(io.chi.rxsnp.fire, false.B ,fsmReg.s_snp)
-    fsmReg.s_snpResp  := Mux(io.respTSlice.fire, false.B ,fsmReg.s_snpResp)
+    fsmReg.s_snpResp  := Mux(io.resp2Slice.fire, false.B ,fsmReg.s_snpResp)
     // wait
     fsmReg.w_snpResp  := Mux(io.chi.txrsp.fire | (io.chi.txdat.fire & getAllData), false.B, fsmReg.w_snpResp)
   }
 
 
-// ---------------------------  Receive Req(TxReq and ReqFSlice) Logic --------------------------------//
+// ---------------------------  Receive Req(TxReq and req2Node) Logic --------------------------------//
   /*
-   * Receive reqFSlice(Snoop)
+   * Receive req2Node(Snoop)
    */
-  reqFSlice.addr      := io.reqFSlice.bits.addr
-  reqFSlice.opcode    := io.reqFSlice.bits.opcode
-  reqFSlice.from      := io.reqFSlice.bits.from
-  reqFSlice.txnId     := io.reqFSlice.bits.txnIdOpt.getOrElse(0.U)
-  reqFSlice.srcId     := io.reqFSlice.bits.srcIdOpt.getOrElse(0.U)
-  reqFSlice.retToSrc  := io.reqFSlice.bits.retToSrc
-  reqFSlice.doNotGoToSD := io.reqFSlice.bits.doNotGoToSD
+  req2Node.addr      := io.req2Node.bits.addr
+  req2Node.opcode    := io.req2Node.bits.opcode
+  req2Node.from      := io.req2Node.bits.from
+  if(djparam.useInNoc) req2Node.tgtIdOpt.get := io.req2Node.bits.tgtIdOpt.get
+  req2Node.txnId     := io.req2Node.bits.txnIdOpt.getOrElse(0.U)
+  req2Node.srcId     := io.req2Node.bits.srcIdOpt.getOrElse(0.U)
+  req2Node.retToSrc  := io.req2Node.bits.retToSrc
+  req2Node.doNotGoToSD := io.req2Node.bits.doNotGoToSD
 
   /*
    * Receive chiTxReq(Read / Dataless / Atomic / CMO)
    */
   reqFTxReq.addr      := io.chi.txreq.bits.addr
   reqFTxReq.opcode    := io.chi.txreq.bits.opcode
-  reqFSlice.txnId     := io.chi.txreq.bits.txnID
+  reqFTxReq.txnId     := io.chi.txreq.bits.txnID
   reqFTxReq.srcId     := io.chi.txreq.bits.srcID
+  reqIsWrite          := CHIOp.REQ.isReadX(io.chi.txreq.bits.opcode)
 
   /*
-   * Save reqFSlice or reqFTxReq
+   * Save req2Node or reqFTxReq
    */
-  reqReg := Mux(io.reqFSlice.fire, reqFSlice, Mux(io.chi.txreq.fire, reqFTxReq, reqReg))
+  reqReg := Mux(io.req2Node.fire, req2Node, Mux(io.chi.txreq.fire, reqFTxReq, reqReg))
 
 
 // ---------------------------  Receive CHI Resp(TxRsp and TxDat) Logic --------------------------------//
@@ -196,6 +200,7 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
 
     snpRespReg        := Mux(rsp.fire, rsp.bits.resp, dat.bits.resp)
     snpRespHasDataReg := dat.fire
+    if(djparam.useDCT) snpFwdStateRegOpt.get := Mux(rsp.fire, rsp.bits.fwdState, dat.bits.fwdState)
   }
 
   /*
@@ -209,6 +214,7 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
    */
   io.chi.rxsnp.valid          := fsmReg.s_snp & !fsmReg.w_dbid
   io.chi.rxsnp.bits           := DontCare
+  if(djparam.useInNoc) io.chi.rxsnp.bits.tgtIDOpt.get := reqReg.tgtIdOpt.get
   io.chi.rxsnp.bits.srcID     := rnSlvId.U
   io.chi.rxsnp.bits.txnID     := reqBufId.U
   io.chi.rxsnp.bits.fwdNID    := reqReg.srcId
@@ -225,12 +231,12 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
   val dbdidRespVal          = fsmReg.s_dbidResp & !fsmReg.w_dbid
   io.chi.rxrsp.valid        := compVal | dbdidRespVal
   io.chi.rxrsp.bits         := DontCare
-  io.chi.rxrsp.bits.opcode  := Mux(compVal, sliceRespReg.opcode, CHIOp.RSP.CompDBIDResp)
+  io.chi.rxrsp.bits.opcode  := Mux(compVal, mpRespReg.opcode, CHIOp.RSP.CompDBIDResp)
   io.chi.rxrsp.bits.tgtID   := reqReg.srcId
   io.chi.rxrsp.bits.srcID   := rnSlvId.U
   io.chi.rxrsp.bits.txnID   := reqReg.txnId
   io.chi.rxrsp.bits.dbID    := reqBufId.U
-  io.chi.rxrsp.bits.resp    := Mux(compVal, sliceRespReg.resp, 0.U)
+  io.chi.rxrsp.bits.resp    := Mux(compVal, mpRespReg.resp, 0.U)
   io.chi.rxrsp.bits.pCrdType := 0.U // This system dont support Transaction Retry
 
 
@@ -239,62 +245,63 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
    */
   io.chi.rxdat.valid        := fsmReg.s_resp & fsmReg.w_dbData & io.dataFDBVal & !fsmReg.w_mpResp
   io.chi.rxdat.bits         := DontCare
-  io.chi.rxdat.bits.opcode  := sliceRespReg.opcode
+  io.chi.rxdat.bits.opcode  := mpRespReg.opcode
   io.chi.rxdat.bits.tgtID   := reqReg.srcId
   io.chi.rxdat.bits.srcID   := rnSlvId.U
   io.chi.rxdat.bits.txnID   := reqBufId.U
   io.chi.rxdat.bits.dbID    := reqReg.txnId
   io.chi.rxdat.bits.homeNID := rnSlvId.U
-  io.chi.rxdat.bits.resp    := sliceRespReg.resp
+  io.chi.rxdat.bits.resp    := mpRespReg.resp
   io.chi.rxdat.bits.dataID  := DontCare
   io.chi.rxdat.bits.data    := DontCare
 
 
-// ---------------------------  Receive respFSlice / Send reqTSlice and respTSlice  --------------------------------//
+// ---------------------------  Receive resp2Node / Send req2Slice and resp2Slice  --------------------------------//
   /*
    * Receive Resp From Slice
    */
-  sliceRespReg := Mux(io.respFSlice.fire, io.respFSlice.bits, sliceRespReg)
+  mpRespReg := Mux(io.resp2Node.fire, io.resp2Node.bits, mpRespReg)
 
 
   /*
    * Send Req To Slice
    */
-  io.reqTSlice.valid            := fsmReg.s_req2mshr & !fsmReg.w_rnData
-  io.reqTSlice.bits.opcode      := reqReg.opcode
-  io.reqTSlice.bits.addr        := reqReg.addr
-  io.reqTSlice.bits.willSnp     := !CHIOp.REQ.isWrite(reqReg.opcode)
-  if (djparam.useDCT) io.reqTSlice.bits.srcIDOpt.get := reqReg.srcId
-  if (djparam.useDCT) io.reqTSlice.bits.txnIDOpt.get := reqReg.txnId
+  io.req2Slice.valid            := fsmReg.s_req2mshr & !fsmReg.w_rnData
+  io.req2Slice.bits.opcode      := reqReg.opcode
+  io.req2Slice.bits.addr        := reqReg.addr
+  io.req2Slice.bits.isSnp       := false.B
+  io.req2Slice.bits.willSnp     := !CHIOp.REQ.isWriteX(reqReg.opcode)
+  if (djparam.useDCT) io.req2Slice.bits.srcIDOpt.get := reqReg.srcId
+  if (djparam.useDCT) io.req2Slice.bits.txnIDOpt.get := reqReg.txnId
   // IdMap
-  io.reqTSlice.bits.to.idL0     := SLICE
-  io.reqTSlice.bits.to.idL1     := DontCare // Remap in Xbar
-  io.reqTSlice.bits.to.idL2     := DontCare
-  io.reqTSlice.bits.from.idL0   := RNSLV
-  io.reqTSlice.bits.from.idL1   := rnSlvId.U
-  io.reqTSlice.bits.from.idL2   := reqBufId.U
+  io.req2Slice.bits.to.idL0     := SLICE
+  io.req2Slice.bits.to.idL1     := DontCare // Remap in Xbar
+  io.req2Slice.bits.to.idL2     := DontCare
+  io.req2Slice.bits.from.idL0   := RNSLV
+  io.req2Slice.bits.from.idL1   := rnSlvId.U
+  io.req2Slice.bits.from.idL2   := reqBufId.U
   // Use in RnMaster
-  io.reqTSlice.bits.retToSrc    := DontCare
-  io.reqTSlice.bits.doNotGoToSD := DontCare
+  io.req2Slice.bits.retToSrc    := DontCare
+  io.req2Slice.bits.doNotGoToSD := DontCare
 
 
 
 
   /*
    * Send Resp To Slice
-   * send update MSHR and send snoop resp also use respTSlice
+   * send update MSHR and send snoop resp also use resp2Slice
    */
-  io.respTSlice.valid           := (fsmReg.s_udpMSHR | fsmReg.s_snpResp) & PopCount(fsmReg.asUInt) === 1.U // only udpMSHR or snpResp need to do
-  io.respTSlice.bits.resp       := snpRespReg
-  io.respTSlice.bits.isSnpResp  := fsmReg.s_snpResp
-  io.respTSlice.bits.dbid       := dbidReg
-  io.respTSlice.bits.mshrSet    := parseMSHRAddress(reqReg.addr)._1
-  io.respTSlice.bits.mshrWay    := sliceRespReg.mshrWay
+  io.resp2Slice.valid           := (fsmReg.s_udpMSHR | fsmReg.s_snpResp) & PopCount(fsmReg.asUInt) === 1.U // only udpMSHR or snpResp need to do
+  io.resp2Slice.bits.resp       := snpRespReg
+  io.resp2Slice.bits.isSnpResp  := fsmReg.s_snpResp
+  io.resp2Slice.bits.dbid       := dbidReg
+  io.resp2Slice.bits.mshrSet    := parseMSHRAddress(reqReg.addr)._1
+  if(djparam.useDCT) io.resp2Slice.bits.fwdStateOpt.get := snpFwdStateRegOpt.get
   // IdMap
-  io.respTSlice.bits.to.idL0    := SLICE
-  io.respTSlice.bits.to.idL1    := DontCare // Remap in Xbar
-  io.respTSlice.bits.to.idL2    := DontCare
-
+  io.resp2Slice.bits.from.idL0  := RNSLV
+  io.resp2Slice.bits.from.idL1  := rnSlvId.U
+  io.resp2Slice.bits.from.idL2  := reqBufId.U
+  io.resp2Slice.bits.to         := Mux(fsmReg.s_udpMSHR, mpRespReg.from, reqReg.from)
 
 
 // ---------------------------  DataBuffer Ctrl Signals  --------------------------------//
@@ -343,8 +350,8 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
   io.chi.txreq.ready  := true.B
   io.chi.txrsp.ready  := true.B
   io.chi.txdat.ready  := true.B
-  io.reqFSlice.ready  := true.B
-  io.respFSlice.ready := true.B
+  io.req2Node.ready  := true.B
+  io.resp2Node.ready := true.B
   io.wResp.ready      := true.B
 
 
@@ -355,17 +362,17 @@ class ReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends DJModu
   assert(Mux(io.free, !io.chi.rxdat.valid, true.B))
   assert(Mux(io.free, !io.chi.rxrsp.valid, true.B))
   assert(Mux(io.free, !io.chi.rxsnp.valid, true.B))
-  assert(Mux(io.free, !io.reqTSlice.valid, true.B))
-  assert(Mux(io.free, !io.respFSlice.valid, true.B))
-  assert(Mux(io.free, !io.respTSlice.valid, true.B))
+  assert(Mux(io.free, !io.req2Slice.valid, true.B))
+  assert(Mux(io.free, !io.resp2Node.valid, true.B))
+  assert(Mux(io.free, !io.resp2Slice.valid, true.B))
   assert(Mux(io.free, !io.reqBufDBID.valid, true.B))
   assert(Mux(io.free, !io.wReq.valid, true.B))
   assert(Mux(io.free, !io.wResp.valid, true.B))
   assert(Mux(io.free, !io.dataFDBVal, true.B))
 
-  assert(Mux(!freeReg, !(io.chi.txreq.valid | io.reqFSlice.valid), true.B), "When ReqBuf valid, it cant input new req")
-  assert(Mux(io.chi.txreq.valid | io.reqFSlice.valid, io.free, true.B), "Reqbuf cant block req input")
-  assert(!(io.chi.txreq.valid & io.reqFSlice.valid), "Reqbuf cant receive txreq and snpTask at the same time")
+  assert(Mux(!freeReg, !(io.chi.txreq.valid | io.req2Node.valid), true.B), "When ReqBuf valid, it cant input new req")
+  assert(Mux(io.chi.txreq.valid | io.req2Node.valid, io.free, true.B), "Reqbuf cant block req input")
+  assert(!(io.chi.txreq.valid & io.req2Node.valid), "Reqbuf cant receive txreq and snpTask at the same time")
   when(release) {
     assert(fsmReg.asUInt === 0.U, "when ReqBuf release, all task should be done")
   }
