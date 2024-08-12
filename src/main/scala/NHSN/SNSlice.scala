@@ -12,12 +12,14 @@ class SNSlice (implicit p : Parameters) extends DSUModule {
     val io = IO(new Bundle {
       val chi              = CHIBundleUpstream(chiBundleParams)
       val chiLinkCtrl      = Flipped(new CHILinkCtrlIO())
-      val readCmemAddr     = Output(Vec(nrBeat, UInt(addressBits.W)))
-      val readCmemEn       = Output(Vec(nrBeat,Bool()))
-      val readCmemRsp      = Input(Vec(nrBeat,UInt(64.W)))
-      val writeCmemAddr    = Output(Vec(nrBeat,UInt(64.W)))
-      val writeCmemData    = Output(Vec(nrBeat, UInt(64.W)))
-      val writeCmemEn      = Output(Vec(nrBeat, Bool()))
+      
+      val readCmemAddr     = Output(UInt(addressBits.W))
+      val readCmemEn       = Output(Bool())
+      val readCmemRsp      = Input(UInt(64.W))
+
+      val writeCmemAddr    = Output(UInt(64.W))
+      val writeCmemData    = Output(UInt(64.W))
+      val writeCmemEn      = Output(Bool())
     })
 
  // ------------------------ Module declaration --------------------------//

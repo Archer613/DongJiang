@@ -26,7 +26,7 @@ class WriteReg(params: CHIBundleParameters) extends  Bundle {
 
 object WrState { // Read Ctl State
     val width      = 2
-    val nrState    = 4
+    val nrState    = 3
     val IDLE       = "b00".U
     val WAITDATA   = "b01".U
     val SENDDAT1   = "b10".U
@@ -36,4 +36,20 @@ class WriteBufTableEntry(implicit p: Parameters) extends DSUBundle {
     val state   = UInt(WrState.width.W)
     val txnID   = UInt(8.W)
     val addr    = UInt(addressBits.W)
+}
+
+object WrDatState {
+    val width   = 2
+    val nrState = 3
+    val IDLE    = "b00".U
+    val WAITDATA = "b01".U
+    val WRDATA   = "b10".U
+}
+
+
+class WriteDataTable extends Bundle {
+    val wrAddr  = UInt(64.W)
+    val data    = UInt(64.W)
+    val txnId   = UInt(8.W)
+    val state   = UInt(WrDatState.width.W)
 }

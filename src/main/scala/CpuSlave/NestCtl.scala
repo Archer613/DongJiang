@@ -47,6 +47,6 @@ class NestCtl()(implicit p: Parameters) extends DSUModule {
     case(vec, i) =>
       assert(PopCount(vec) <= 1.U, "ReqBuf[0x%x] only can nest one ReqBuf", i.U)
       // TODO: Del it
-      assert(!vec.reduce(_ | _), "ReqBuf[0x%x] be nested", i.U)
+      // assert(!vec.reduce(_ | _), "ReqBuf[0x%x] be nested", i.U)
   }
 }

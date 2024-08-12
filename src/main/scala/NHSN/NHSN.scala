@@ -16,7 +16,7 @@ class NHSN (implicit p : Parameters) extends DSUModule {
  // -------------------------- Module declaration -----------------------------//
 
   val snSlices            = Seq.fill(dsuparam.nrBank) { Module(new SNSlice())}
-  val cmem                = Seq.fill(dsuparam.nrBank){Seq.fill(nrBeat){Module(new MemHelper())}}
+  val cmem                = Seq.fill(dsuparam.nrBank){Module(new MemHelper())}
 
  // -------------------------- Connect declaration -----------------------------//
 
@@ -26,14 +26,17 @@ class NHSN (implicit p : Parameters) extends DSUModule {
 /* 
  * SNSlice is connected to RegMem
  */
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemEn).foreach{case(mem,ren) => mem.ren := ren}}
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemRsp).foreach{case(mem,rsp) => rsp := mem.rdata}}
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemAddr).foreach{case(mem,addr) => mem.rIdx := addr}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemEn).foreach{case(mem,ren) => mem.ren := ren}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemRsp).foreach{case(mem,rsp) => rsp := mem.rdata}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.readCmemAddr).foreach{case(mem,addr) => mem.rIdx := addr}}
 
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemAddr).foreach{case(mem, addr) => mem.wIdx := addr}}
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemData).foreach{case(mem, wdata) => mem.wdata := wdata}}
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemEn).foreach{case(mem, wren) => mem.wen := wren}}
-  cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemEn).foreach{case(mem, wren) => mem.clk := clock}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemAddr).foreach{case(mem, addr) => mem.wIdx := addr}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemData).foreach{case(mem, wdata) => mem.wdata := wdata}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemEn).foreach{case(mem, wren) => mem.wen := wren}}
+  // cmem.zip(snSlices).foreach{case(sliceMem, sn) => sliceMem.zip(sn.io.writeCmemEn).foreach{case(mem, wren) => mem.clk := clock}}
+
+  cmem.zip(snSlices).foreach{case(mem, sn) => mem.rIdx := sn.io.readCmemAddr;  mem.ren := sn.io.readCmemEn;  sn.io.readCmemRsp := mem.rdata}
+  cmem.zip(snSlices).foreach{case(mem, sn) => mem.wIdx := sn.io.writeCmemAddr; mem.wen := sn.io.writeCmemEn; mem.wdata := sn.io.writeCmemData; mem.clk := clock}
 
 
 

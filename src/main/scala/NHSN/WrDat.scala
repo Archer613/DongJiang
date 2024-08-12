@@ -10,32 +10,39 @@ class WrDat (implicit p : Parameters) extends DSUModule {
  // -------------------------- IO declaration -----------------------------//
     val io = IO(new Bundle {
       val writeDataIn              = Flipped(Decoupled(new WriteData(chiBundleParams)))
-      val writeCmemAddr            = Output(Vec(nrBeat, UInt(64.W)))
-      val writeCmemData            = Output(Vec(nrBeat,UInt(64.W)))
-      val writeEnable              = Output(Vec(nrBeat, Bool()))
+      val writeCmemAddr            = Output(UInt(64.W))
+      val writeCmemData            = Output(UInt(64.W))
+      val writeEnable              = Output(Bool())
     })
 
  // ------------------------ Wire/Reg declaration ---------------------------//
   
   val firstBeat                    = Wire(Bool())
   val secondBeat                   = Wire(Bool())
-  val writeData                    = WireInit(0.U(64.W))
-  val writeAddr                    = WireInit(0.U(64.W))
+  val writeData1                   = RegInit(0.U(32.W))
+  val writeData2                   = RegInit(0.U(32.W))
+  val writeAddr                    = RegInit(0.U(64.W))
 
 // ------------------------------- Logic ------------------------------------//
   
   firstBeat                        := io.writeDataIn.bits.dataID === 0.U & io.writeDataIn.fire
   secondBeat                       := io.writeDataIn.bits.dataID === 2.U & io.writeDataIn.fire
-  writeData                        := io.writeDataIn.bits.data(63,0)
-  dontTouch(writeData)
-  writeAddr                        := io.writeDataIn.bits.addr
+  
+
+  when(firstBeat){
+    writeData1                     := io.writeDataIn.bits.data(31,0)
+  }
+  when(secondBeat){
+    writeData2                     := io.writeDataIn.bits.data(31,0)
+    writeAddr                      := io.writeDataIn.bits.addr
+  }
 
 /* 
  * Output logic
  */
-  io.writeCmemAddr                 := VecInit(Seq.fill(nrBeat)(writeAddr))
-  io.writeCmemData                 := VecInit(Seq.fill(nrBeat)(writeData))
-  io.writeEnable                   := VecInit(Seq(firstBeat, secondBeat))
+  io.writeCmemAddr                 := writeAddr
+  io.writeCmemData                 := Cat(writeData1, writeData2)
+  io.writeEnable                   := RegNext(secondBeat)
   io.writeDataIn.ready             := true.B
 
 }

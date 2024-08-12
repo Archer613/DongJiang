@@ -12,9 +12,11 @@ class DatGen (implicit p : Parameters) extends DSUModule {
     val io = IO(new Bundle {
       val readReqFlit      = Flipped(Decoupled(new CHIBundleREQ(chiBundleParams)))
       val dataFlit         = Decoupled(new CHIBundleDAT(chiBundleParams))
-      val readCmemAddr     = Output(Vec(nrBeat, UInt(64.W)))
-      val readCmemEn       = Output(Vec(nrBeat, Bool()))
-      val cmemRdRsp        = Input(Vec(nrBeat,UInt(64.W)))
+      
+      val readCmemAddr     = Output(UInt(64.W))
+      val readCmemEn       = Output(Bool())
+      val cmemRdRsp        = Input(UInt(64.W))
+
       val bufNoEmpty       = Output(Bool())
       val fsmFull          = Input(Bool())
       val datQueueFull     = Output(Bool())
@@ -57,14 +59,14 @@ class DatGen (implicit p : Parameters) extends DSUModule {
 
   dataFlitEnq.tgtID       := dsuparam.idmap.HNID.U
   dataFlitEnq.srcID       := dsuparam.idmap.SNID.U
-  dataFlitEnq.data        := respData(0)
+  dataFlitEnq.data        := respData(63, 32)
   dataFlitEnq.dataID      := 0.U
   dataFlitEnq.opcode      := DAT.CompData
   dataFlitEnq.txnID       := io.readReqFlit.bits.txnID
 
   dataFlitEnqReg.tgtID    := dsuparam.idmap.HNID.U
   dataFlitEnqReg.srcID    := dsuparam.idmap.SNID.U
-  dataFlitEnqReg.data     := respData(1)
+  dataFlitEnqReg.data     := respData(31, 0)
   dataFlitEnqReg.dataID   := 2.U
   dataFlitEnqReg.opcode   := DAT.CompData
   dataFlitEnqReg.txnID    := io.readReqFlit.bits.txnID
@@ -78,8 +80,8 @@ class DatGen (implicit p : Parameters) extends DSUModule {
  * Output logic
  */
 
-  io.readCmemAddr         := Seq(readAddr, readAddr)
-  io.readCmemEn           := Seq(io.readReqFlit.fire, io.readReqFlit.fire)
+  io.readCmemAddr         := readAddr
+  io.readCmemEn           := io.readReqFlit.fire
   io.dataFlit.valid       := !queueEmpty
   io.dataFlit.bits        := Mux(queue.io.deq.fire, queue.io.deq.bits, 0.U.asTypeOf(io.dataFlit.bits))
   io.readReqFlit.ready    := !enqValidReg & !queueFull & !io.fsmFull & !io.rspQueueFull
