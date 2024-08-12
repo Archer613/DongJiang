@@ -1,6 +1,5 @@
 package DONGJIANG.CHI
 
-import CHI.{RespErr, Order, MemAttr}
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config._
@@ -68,6 +67,7 @@ class CHIBundleSNP(params: CHIBundleParameters) extends Bundle with HasChiOpcode
     override def opcodeBits: Int = 5
 
     val qos            = UInt(4.W)
+    val tgtIDOpt       = if(params.snpHasTgtId) Some(UInt(params.nodeIdBits.W)) else None
     val srcID          = UInt(params.nodeIdBits.W)
     val txnID          = UInt(params.txnidBits.W)
     val fwdNID         = UInt(params.nodeIdBits.W)
