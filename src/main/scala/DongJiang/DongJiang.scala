@@ -3,6 +3,7 @@ package DONGJIANG
 import DONGJIANG.CHI._
 import DONGJIANG.RNSLAVE._
 import DONGJIANG.RNMASTER._
+import DONGJIANG.SNMASTER._
 import DONGJIANG.SLICE._
 import chisel3._
 import chisel3.util._
@@ -194,13 +195,14 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
  *
  * *********************************************************** SNMASTRE *************************************************************************
  *
+ * nodeID       <-> RnMaster
  * reqBufId     <-> ReqBuf
  *
- * { Read                           }   TxReq: Send  { TgtID = 0          |  SrcID   = 0         |   TxnID   = reqBufId  |                      }
+ * { Read                           }   TxReq: Send  { TgtID = 0          |  SrcID   = nodeID    |   TxnID   = reqBufId  |                      }
  * { CompData                       }   RxDat: Match {                    |                      |   TxnID  == reqBufId  |                      }
  *
- * { Write                          }   TxReq: Send  { TgtID = 0          |  SrcID   = 0         |   TxnID   = reqBufId  |                      }
- * { WriteData                      }   TxDat: Send  { TgtID = 0          |  SrcID   = 0         |   TxnID   = DBID_g    |                      }
+ * { Write                          }   TxReq: Send  { TgtID = 0          |  SrcID   = nodeID    |   TxnID   = reqBufId  |                      }
+ * { WriteData                      }   TxDat: Send  { TgtID = 0          |  SrcID   = nodeID    |   TxnID   = DBID_g    |                      }
  * { CompDBIDResp                   }   RxRsp: M & G {                    |                      |   TxnID  == reqBufId  |  DBID_g = DBID       }
  *
  */
@@ -221,9 +223,14 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
 // ------------------------------------------ Modules declaration ----------------------------------------------//
     def createRnSlv(id: Int) = { val rnSlv = Module(new RnSlave(id)); rnSlv }
     def createRnMas(id: Int) = { val rnMas = Module(new RnMaster(id)); rnMas }
+    def createSnMas(id: Int) = { val snMas = Module(new SnMaster(id)); snMas }
+
     val rnSlaves    = (0 until nrRnSlv).map(i => createRnSlv(i))
     val rnMasters   = (nrRnSlv until nrRnNode).map(i => createRnMas(i))
+    val snMasters   = (0 until djparam.nrBank).map(i => createSnMas(i))
+
     val rnNodes     = rnSlaves ++ rnMasters
+
     val xbar        = Module(new RN2SliceXbar())
     val slices      = Seq.fill(djparam.nrBank) { Module(new Slice()) }
 
@@ -242,6 +249,10 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
     rnMasters.map(_.chiIO.chnls).zip(io.rnMasChi).foreach { case (a, b) => a <> b }
     rnMasters.map(_.chiIO.linkCtrl).zip(io.rnMasChiLinkCtrl).foreach { case (a, b) => a <> b }
 
+    snMasters.map(_.chiIO.chnls).zip(io.snMasChi).foreach { case (a, b) => a <> b }
+    snMasters.map(_.chiIO.linkCtrl).zip(io.snMasChiLinkCtrl).foreach { case (a, b) => a <> b }
+    io.snMasChi.map(_.txrsp <> DontCare)
+    io.snMasChi.map(_.rxsnp <> DontCare)
 
     /*
      * Connect RNs <-> Xbar
@@ -283,6 +294,18 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
             xbar.io.resp2Slice.out(i)   <> slice.io.rnResp2Slice
             // slice DataBuffer signals
             xbar.io.dbSigs.out(i)       <> slice.io.rnDBSigs
+    }
+
+    /*
+     * Connect Slice <-> SnMaster
+     */
+    slices.zipWithIndex.foreach {
+        case (slice, i) =>
+            // slice ctrl signals
+            snMasters(i).io.req2Node    <> slice.io.req2RnNode
+            snMasters(i).io.resp2Slice  <> slice.io.rnResp2Slice
+            // slice DataBuffer signals
+            snMasters(i).io.dbSigs      <> slice.io.rnDBSigs
     }
 
 }

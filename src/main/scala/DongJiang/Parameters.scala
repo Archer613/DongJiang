@@ -37,12 +37,16 @@ case class SnNodeParam
     name: String = "SnMaster",
     nrReqBuf: Int = 16,
     addressBits: Int = 48,
+    addressId: Int = 0,
+    addressIdBits: Int = 0,
     aggregateIO: Boolean = false,
     // can receive or send chi lcrd num
     nrSnTxLcrdMax: Int = 4,
     nrSnRxLcrdMax: Int = 4,
 
 ) {
+    val isSlave = false
+    val isMaster = !isSlave // SN be Master forever
     val hasReq2Slice = false
     val hasDBRCReq = true // must be true when its master
     require(nrSnTxLcrdMax <= 15)
@@ -156,6 +160,9 @@ trait HasDJParam {
     val cReplWayBits    = djparam.clientDirWays - 1
     require(djparam.selfReplacementPolicy == "random" | djparam.selfReplacementPolicy == "plru", "It should modify sReplWayBits when use replacement except of random or plru")
     require(djparam.clientReplacementPolicy == "random" | djparam.clientReplacementPolicy == "plru", "It should modify cReplWayBits when use replacement except of random or plru")
+
+    // Node address id map check
+    // TODO
 
     // TIMEOUT CHECK CNT VALUE
     val TIMEOUT_RB      = 10000 // ReqBuf

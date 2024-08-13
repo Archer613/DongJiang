@@ -274,7 +274,7 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   if (djparam.useDCT) io.req2Slice.bits.srcIDOpt.get := reqReg.srcId
   if (djparam.useDCT) io.req2Slice.bits.txnIDOpt.get := reqReg.txnId
   // IdMap
-  io.req2Slice.bits.to.idL0     := SLICE
+  io.req2Slice.bits.to.idL0     := IdL0.SLICE
   io.req2Slice.bits.to.idL1     := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.req2Slice.bits.to.idL2     := DontCare
   io.req2Slice.bits.from.idL0   := RNSLV
@@ -310,7 +310,7 @@ class RnSlvReqBuf(rnSlvId: Int, reqBufId: Int)(implicit p: Parameters) extends D
    */
   io.wReq.valid           := fsmReg.s_getDBID
   // IdMap
-  io.wReq.bits.to.idL0    := SLICE
+  io.wReq.bits.to.idL0    := IdL0.SLICE
   io.wReq.bits.to.idL1    := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.wReq.bits.to.idL2    := DontCare
   io.wReq.bits.from.idL0  := RNSLV
