@@ -6,10 +6,10 @@ import org.chipsalliance.cde.config._
 
 class InboundLinkCtrl()(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
-    val chiLinkCtrl = Flipped(new CHILinkCtrlIO())
-    val txState = Output(UInt(LinkStates.width.W))
-    val rxState = Output(UInt(LinkStates.width.W))
-    val rxRun   = Input(Bool())
+    val chiLinkCtrl     = Flipped(new CHILinkCtrlIO())
+    val txState         = Output(UInt(LinkStates.width.W))
+    val rxState         = Output(UInt(LinkStates.width.W))
+    val rxRun           = Input(Bool())
     val txAllLcrdRetrun = Input(Bool())
   })
   // DontCare txsactive and rxsactive
