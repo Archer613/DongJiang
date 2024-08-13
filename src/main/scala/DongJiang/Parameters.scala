@@ -68,7 +68,9 @@ case class DJParam(
                     snNodeMes: Seq[SnNodeParam] = Seq(SnNodeParam( name = "SnMaster_0" ),
                                                       SnNodeParam( name = "SnMaster_1" )),
                     // ------------------------ Slice Base Mes ------------------ //
-                    nrMpQueueBeat: Int = 4,
+                    nrMpTaskQueue: Int = 4,
+                    nrMpReqQueue: Int = 6,
+                    nrMpRespQueue: Int = 4,
                     mpBlockBySet: Boolean = true,
                     // MSHR
                     nrMSHRSet: Int = 4,
@@ -93,7 +95,9 @@ case class DJParam(
                     clientReplacementPolicy: String = "plru",
                   ) {
     require(rnNodeMes.length > 0)
-    require(nrMpQueueBeat > 0)
+    require(nrMpTaskQueue > 0)
+    require(nrMpReqQueue > nrMpTaskQueue)
+    require(nrMpRespQueue > 0)
     require(nrMSHRSet <= selfSets)
     require(nrBank == 1 | nrBank == 2 | nrBank == 4)
     require(snNodeMes.length == nrBank)
@@ -121,6 +125,11 @@ trait HasDJParam {
 
     // SN Parameters
     val snReqBufIdBits  = log2Ceil(djparam.snNodeMes.map(_.nrReqBuf).max)
+
+    // Slice Queue
+    val mpTaskQBits     = log2Ceil(djparam.nrMpTaskQueue)
+    val mpReqQBits      = log2Ceil(djparam.nrMpReqQueue)
+    val mpRespQBits     = log2Ceil(djparam.nrMpRespQueue)
 
     // Slice Id Bits Parameters
     val snpCtlIdBits    = log2Ceil(djparam.nrSnpCtl)

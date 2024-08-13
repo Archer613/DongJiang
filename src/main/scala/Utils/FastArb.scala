@@ -53,4 +53,15 @@ object FastArb {
         out.bits := arb.io.out.bits
         out.valid := arb.io.out.valid
     }
+
+    def fastPriorityArbDec[T <: Bundle](in: Seq[DecoupledIO[T]], name: Option[String] = None): DecoupledIO[T] = {
+        val arb = Module(new Arbiter[T](chiselTypeOf(in(0).bits), in.size))
+        if (name.nonEmpty) {
+            arb.suggestName(s"${name.get}_arb")
+        }
+        for ((a, req) <- arb.io.in.zip(in)) {
+            a <> req
+        }
+        arb.io.out
+    }
 }

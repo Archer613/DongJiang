@@ -192,7 +192,20 @@ class DBBundle(hasDBRCReq: Boolean = false)(implicit p: Parameters) extends DJBu
 }
 
 
+// ---------------------------------------------------------------- DataBuffer Base Bundle ----------------------------------------------------------------------------- //
+class MpTaskBundle(implicit p: Parameters) extends DJBundle
 
+class UpdateMSHRBundle(implicit p: Parameters) extends DJBundle
+
+class DSTaskBundle(implicit p: Parameters) extends DJBundle
+
+class DirReadBundle(implicit p: Parameters) extends DJBundle
+
+class DirRespBundle(implicit p: Parameters) extends DJBundle
+
+class DirWriteBundle(implicit p: Parameters) extends DJBundle
+
+class SnpTaskBundle(implicit p: Parameters) extends DJBundle
 
 
 

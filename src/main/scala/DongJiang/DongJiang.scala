@@ -234,8 +234,8 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
     val xbar        = Module(new RN2SliceXbar())
     val slices      = Seq.fill(djparam.nrBank) { Module(new Slice()) }
 
-    slices.foreach(_.io <> DontCare)
     // TODO:
+    slices.foreach(_.io.valid := true.B)
     xbar.io.bankVal.foreach(_ := true.B)
 
 
@@ -281,6 +281,11 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
             xbar.io.dbSigs.in(i).dataTDB            <> rn.io.dbSigs.dataTDB
     }
 
+    /*
+     * Seq Slice Id Value
+     */
+    slices.zipWithIndex.foreach { case(s, i) => s.io.sliceId := i.U }
+
 
     /*
      * Connect Slice <-> Xbar
@@ -302,10 +307,10 @@ class DongJiang()(implicit p: Parameters) extends DJModule {
     slices.zipWithIndex.foreach {
         case (slice, i) =>
             // slice ctrl signals
-            snMasters(i).io.req2Node    <> slice.io.req2RnNode
-            snMasters(i).io.resp2Slice  <> slice.io.rnResp2Slice
+            snMasters(i).io.req2Node    <> slice.io.req2SnNode
+            snMasters(i).io.resp2Slice  <> slice.io.snResp2Slice
             // slice DataBuffer signals
-            snMasters(i).io.dbSigs      <> slice.io.rnDBSigs
+            snMasters(i).io.dbSigs      <> slice.io.snDBSigs
     }
 
 }
