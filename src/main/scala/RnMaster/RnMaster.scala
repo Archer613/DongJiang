@@ -35,7 +35,7 @@ class RnMaster(rnMasId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Sli
   // ------------------------ Connection ---------------------------//
   chiCtrl.io.chiLinkCtrl <> chiIO.linkCtrl
   chiCtrl.io.txRun := true.B // TODO
-  chiCtrl.io.txAllLcrdRetrun := rxRsp.io.allLcrdRetrun | rxRsp.io.allLcrdRetrun | rxDat.io.allLcrdRetrun
+  chiCtrl.io.rxAllLcrdRetrun := rxRsp.io.allLcrdRetrun | rxRsp.io.allLcrdRetrun | rxDat.io.allLcrdRetrun
 
   txReq.io.linkState := chiCtrl.io.txState
   txReq.io.chi <> chiIO.chnls.txreq

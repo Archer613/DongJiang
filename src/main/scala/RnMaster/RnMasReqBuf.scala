@@ -15,7 +15,6 @@ class RBFSMState(implicit p: Parameters) extends Bundle {
 
   val s_getDBID   = Bool() // when need to send Read
   val s_compAck   = Bool() // when Req Done
-  val s_reqResp   = Bool() // to Slice
 
   val s_snp2mshr  = Bool() // to Slice
   val s_snpResp   = Bool() // to CHI RSP / DAT
@@ -67,6 +66,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   val reqReg        = RegInit(0.U.asTypeOf(new DJBundle with HasFromIDBits {
     val addr        = UInt(addressBits.W)
     val opcode      = UInt(6.W)
+    val resp        = UInt(ChiResp.width.W) // for write back
     val txnId       = UInt(chiParams.txnidBits.W)
     val srcId       = UInt(chiParams.nodeIdBits.W)
     val tgtId       = UInt(chiParams.nodeIdBits.W)
@@ -92,7 +92,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   val reqSendAllData    = WireInit(false.B) // Send all Data to HN when need to send CompData / WriteData
   val snpSendAllData    = WireInit(false.B) // Send all Data to HN when need to send SnpRespData
   // req resp to slice req
-  val reqRespReg        = RegInit(0.U(3.W))
+  val reqRespReg        = RegInit(0.U(ChiResp.width.W))
   val reqRespHasDataReg = RegInit(false.B)
   val reqRespDBIDReg    = RegInit(0.U(chiParams.dbidBits.W))
   val reqRespHomeNIdOrSrcIdReg = RegInit(0.U(chiParams.nodeIdBits.W)) // CompData HomeNID or Comp SrcID
@@ -126,7 +126,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
     fsmReg.s_req      := true.B
     fsmReg.s_getDBID  := reqNeedData
     fsmReg.s_compAck  := io.req2Node.bits.expCompAck
-    fsmReg.s_reqResp  := true.B
+    fsmReg.s_reqUdpMSHR := true.B
     // wait
     fsmReg.w_dbid     := true.B
     fsmReg.w_hnResp   := true.B
@@ -144,7 +144,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
     /*
      * Commmon
      */
-    fsmReg.s_req      := Mux(io.req2Slice.fire,                 false.B, fsmReg.s_req)
+    fsmReg.s_req      := Mux(io.chi.txreq.fire,                 false.B, fsmReg.s_req)
     fsmReg.s_data     := Mux(io.chi.txdat.fire & reqSendAllData,false.B, fsmReg.s_data)
     fsmReg.s_rcDB     := Mux(io.dbRCReq.fire,                   false.B, fsmReg.s_rcDB)
     fsmReg.w_dbData   := Mux(io.dataFDBVal & getAllData,        false.B, fsmReg.w_dbData)
@@ -160,7 +160,6 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
      */
     fsmReg.s_getDBID  := Mux(io.wReq.fire,                      false.B, fsmReg.s_getDBID)
     fsmReg.s_compAck  := Mux(io.chi.txrsp.fire,                 false.B, fsmReg.s_compAck)
-    fsmReg.s_reqResp  := Mux(io.resp2Slice.fire,                false.B, fsmReg.s_reqResp)
     fsmReg.w_dbid     := Mux(io.wResp.fire,                     false.B, fsmReg.w_dbid)
     fsmReg.w_hnResp   := Mux(io.chi.rxrsp.fire | (io.chi.rxdat.fire & getAllData), false.B, fsmReg.w_hnResp)
 
@@ -168,7 +167,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
      * Snoop Req
      * Must send CompData before SnpRespData in DCT
      */
-    fsmReg.s_snp2mshr := Mux(io.req2Node.fire,                 false.B, fsmReg.s_snp2mshr)
+    fsmReg.s_snp2mshr := Mux(io.req2Slice.fire,                 false.B, fsmReg.s_snp2mshr)
     fsmReg.s_snpResp  := Mux(io.chi.txrsp.fire | (io.chi.txdat.fire & snpSendAllData), false.B, fsmReg.s_snpResp)
     fsmReg.w_mpResp   := Mux(io.resp2Node.fire,                 false.B, fsmReg.w_mpResp)
     fsmReg.s_snpUdpMSHR := Mux(io.resp2Slice.fire,              false.B, fsmReg.s_snpUdpMSHR)
@@ -181,6 +180,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
    */
   req2Node.addr       := io.req2Node.bits.addr
   req2Node.opcode     := io.req2Node.bits.opcode
+  req2Node.resp       := io.req2Node.bits.resp
   req2Node.from       := io.req2Node.bits.from
   req2Node.tgtId      := io.req2Node.bits.tgtID
   reqIsWrite          := CHIOp.REQ.isWriteX(io.req2Node.bits.opcode)
@@ -247,7 +247,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   /*
    * Send TxRsp(CompAck or SnpResp)
    */
-  io.chi.txrsp.valid        := (fsmReg.s_compAck & !fsmReg.s_reqResp) | (fsmReg.s_snpResp & !fsmReg.w_mpResp & !reqReg.retToSrc)
+  io.chi.txrsp.valid        := (fsmReg.s_compAck & !fsmReg.w_hnResp) | (fsmReg.s_snpResp & !fsmReg.w_mpResp & !reqReg.retToSrc)
   io.chi.txrsp.bits         := DontCare
   io.chi.txrsp.bits.opcode  := Mux(fsmReg.s_compAck, CHIOp.RSP.CompAck,         mpRespReg.opcode)
   io.chi.txrsp.bits.tgtID   := Mux(fsmReg.s_compAck, reqRespHomeNIdOrSrcIdReg,  reqReg.srcId)
@@ -262,16 +262,16 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
    */
   io.chi.txdat.valid        := (fsmReg.s_data  | (fsmReg.s_snpResp & reqReg.retToSrc)) & !fsmReg.w_mpResp & fsmReg.w_dbData & io.dataFDBVal
   io.chi.txdat.bits         := DontCare
-  //                                                                      [WriteData]         [CompData]                [SnpRespData]
-  io.chi.txdat.bits.opcode  := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  mpRespReg.opcode,   CHIOp.DAT.CompData),      mpRespReg.opcode)
-  io.chi.txdat.bits.tgtID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  reqReg.tgtId,       reqReg.fwdNIdOpt.get),    reqReg.srcId)
-  io.chi.txdat.bits.srcID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  rnMasId.U,          rnMasId.U),               rnMasId.U)
-  io.chi.txdat.bits.txnID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  reqRespDBIDReg,     reqReg.fwdTxnIdOpt.get),  reqReg.txnId)
-  io.chi.txdat.bits.homeNID := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  DontCare,           reqReg.srcId),            DontCare)
+  //                                                                      [WriteData]               [CompData]                [SnpRespData]
+  io.chi.txdat.bits.opcode  := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  CHIOp.DAT.CopyBackWrData, CHIOp.DAT.CompData),      mpRespReg.opcode)
+  io.chi.txdat.bits.tgtID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  reqReg.tgtId,             reqReg.fwdNIdOpt.get),    reqReg.srcId)
+  io.chi.txdat.bits.srcID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  rnMasId.U,                rnMasId.U),               rnMasId.U)
+  io.chi.txdat.bits.txnID   := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  reqRespDBIDReg,           reqReg.fwdTxnIdOpt.get),  reqReg.txnId)
+  io.chi.txdat.bits.homeNID := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  DontCare,                 reqReg.srcId),            DontCare)
   io.chi.txdat.bits.respErr := RespErr.NormalOkay // TODO: Complete data error indicate
-  io.chi.txdat.bits.resp    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  mpRespReg.resp,     mpRespReg.fwdStateOpt.getOrElse(0.U)), mpRespReg.resp)
-  io.chi.txdat.bits.fwdState := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp, DontCare,           DontCare),                mpRespReg.fwdStateOpt.getOrElse(0.U))
-  io.chi.txdat.bits.dbID    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  DontCare,           reqReg.txnId),            DontCare)
+  io.chi.txdat.bits.resp    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  reqReg.resp,              mpRespReg.fwdStateOpt.getOrElse(0.U)), mpRespReg.resp)
+  io.chi.txdat.bits.fwdState := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp, DontCare,                 DontCare),                mpRespReg.fwdStateOpt.getOrElse(0.U))
+  io.chi.txdat.bits.dbID    := Mux(fsmReg.s_data, Mux(!fsmReg.s_snpResp,  DontCare,                 reqReg.txnId),            DontCare)
   // Count
   sendTxDatNumReg           := Mux(release, 0.U, sendTxDatNumReg + io.chi.txdat.fire)
   reqSendAllData            := sendTxDatNumReg === nrBeat.U       | (sendTxDatNumReg === (nrBeat - 1).U & io.chi.txdat.fire)
@@ -300,7 +300,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   if (djparam.useDCT) io.req2Slice.bits.srcIDOpt.get := reqReg.srcId
   if (djparam.useDCT) io.req2Slice.bits.txnIDOpt.get := reqReg.txnId
   // IdMap
-  io.req2Slice.bits.to.idL0     := SLICE
+  io.req2Slice.bits.to.idL0     := IdL0.SLICE
   io.req2Slice.bits.to.idL1     := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.req2Slice.bits.to.idL2     := DontCare
   io.req2Slice.bits.from.idL0   := RNSLV
@@ -349,7 +349,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
    */
   io.wReq.valid           := fsmReg.s_getDBID
   // IdMap
-  io.wReq.bits.to.idL0    := SLICE
+  io.wReq.bits.to.idL0    := IdL0.SLICE
   io.wReq.bits.to.idL1    := parseAddress(reqReg.addr)._2 // Remap in Xbar
   io.wReq.bits.to.idL2    := DontCare
   io.wReq.bits.from.idL0  := RNSLV

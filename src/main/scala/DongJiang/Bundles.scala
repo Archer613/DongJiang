@@ -135,6 +135,7 @@ trait HasReq2NodeBundle extends DJBundle with HasAddr { this: Bundle =>
     // CHI Mes (Common)
     val opcode      = UInt(6.W)
     // CHI Mes (Use in RnMaster)
+    val resp        = UInt(ChiResp.width.W) // Use in write back
     val expCompAck  = Bool()
     val tgtID       = UInt(chiParams.nodeIdBits.W)
 }
