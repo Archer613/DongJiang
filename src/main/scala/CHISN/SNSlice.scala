@@ -8,6 +8,7 @@ import DONGJIANG.CHI._
 import DONGJIANG.CHI.CHIOp._
 
 class SNSlice(snId: Int) (implicit p : Parameters) extends DJModule {
+  val nodeParam                = djparam.snNodeMes(snId)
  // -------------------------- IO declaration -----------------------------//
     val io = IO(new Bundle {
       val chi              = CHIBundleUpstream(chiParams)
@@ -23,28 +24,36 @@ class SNSlice(snId: Int) (implicit p : Parameters) extends DJModule {
     })
 
  // ------------------------ Module declaration --------------------------//
-  val snChiCtrl             = Module(new ProtocolLayerCtrl())
-  val snChiTxReq            = Module(new DSUChiTxReq(snId))
-  val snChiTxDat            = Module(new DSUChiTxDat(snId))
-  val snChiRxDat            = Module(new DSUChiRxDat(snId))
-  val snChiRxRsp            = Module(new DSUChiRxRsp(snId))
+
+  val snChiCtrl             = Module(new InboundLinkCtrl())
+  val snChiTxReq            = Module(new InboundFlitCtrl(gen = new CHIBundleREQ(chiParams), lcrdMax = nodeParam.nrSnTxLcrdMax, nodeParam.aggregateIO))
+  val snChiTxDat            = Module(new InboundFlitCtrl(gen = new CHIBundleDAT(chiParams), lcrdMax = nodeParam.nrSnTxLcrdMax, nodeParam.aggregateIO))
+
+  val snChiRxDat            = Module(new OutboundFlitCtrl(gen = new CHIBundleDAT(chiParams), lcrdMax = nodeParam.nrSnRxLcrdMax, nodeParam.aggregateIO))
+  val snChiRxRsp            = Module(new OutboundFlitCtrl(gen = new CHIBundleRSP(chiParams), lcrdMax = nodeParam.nrSnRxLcrdMax, nodeParam.aggregateIO))
+
+
   val writeBuffer           = Module(new WriteBuf())
   val writeDat              = Module(new WrDat())
   val rspGen                = Module(new RspGen(snId))
   val datGen                = Module(new DatGen(snId))
+
+  val rxActive              = Wire(Bool())
 
 
 
 
 // ------------------------------ Logic --------------------------------//
 
-  snChiCtrl.io.txAllLcrdRetrun   := snChiTxReq.io.lcrdReturn || snChiTxDat.io.lcrdReturn
-  snChiCtrl.io.rspFlitBufNoEmpty := rspGen.io.bufNoEmpty
-  snChiCtrl.io.datFlitBufNoEmpty := datGen.io.bufNoEmpty
+  snChiCtrl.io.txAllLcrdRetrun   := snChiTxReq.io.allLcrdRetrun || snChiTxDat.io.allLcrdRetrun
+  // snChiCtrl.io.rspFlitBufNoEmpty := rspGen.io.bufNoEmpty
+  // snChiCtrl.io.datFlitBufNoEmpty := datGen.io.bufNoEmpty
+  
+  rxActive                       := rspGen.io.bufNoEmpty || datGen.io.bufNoEmpty
+  snChiCtrl.io.rxRun             := rxActive
 
-
-  snChiTxReq.io.txState          := snChiCtrl.io.txState
-  snChiTxDat.io.txState          := snChiCtrl.io.txState
+  snChiTxReq.io.linkState        := snChiCtrl.io.txState
+  snChiTxDat.io.linkState        := snChiCtrl.io.txState
 
   writeBuffer.io.reqFlit         <> snChiTxReq.io.flit
   writeBuffer.io.datFlit         <> snChiTxDat.io.flit
@@ -65,8 +74,8 @@ class SNSlice(snId: Int) (implicit p : Parameters) extends DJModule {
   datGen.io.rspQueueFull         := rspGen.io.rspQueueFull
 
   snChiRxDat.io.flit             <> datGen.io.dataFlit
-  snChiRxDat.io.rxState          := snChiCtrl.io.rxState
-  snChiRxRsp.io.rxState          := snChiCtrl.io.rxState
+  snChiRxDat.io.linkState        := snChiCtrl.io.rxState
+  snChiRxRsp.io.linkState        := snChiCtrl.io.rxState
   snChiRxRsp.io.flit             <> rspGen.io.rspFlitOut
 
 /* 
