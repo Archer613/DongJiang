@@ -69,7 +69,7 @@ case class DJParam(
                                                       SnNodeParam( name = "SnMaster_1" )),
                     // ------------------------ Slice Base Mes ------------------ //
                     nrMpTaskQueue: Int = 4,
-                    nrMpReqQueue: Int = 6,
+                    nrMpReqQueue: Int = 4,
                     nrMpRespQueue: Int = 4,
                     mpBlockBySet: Boolean = true,
                     // MSHR
@@ -96,7 +96,7 @@ case class DJParam(
                   ) {
     require(rnNodeMes.length > 0)
     require(nrMpTaskQueue > 0)
-    require(nrMpReqQueue > nrMpTaskQueue)
+    require(nrMpReqQueue > 0)
     require(nrMpRespQueue > 0)
     require(nrMSHRSet <= selfSets)
     require(nrBank == 1 | nrBank == 2 | nrBank == 4)
@@ -208,12 +208,15 @@ trait HasDJParam {
 
     def parseMSHRAddress(x: UInt): (UInt, UInt, UInt) = {
         val tag = WireInit(0.U(mshrTagBits.W))
-        val (tag_, set, modBank, bank, offset) = parseAddress(x, modBankBits = 0, setBits = mshrSetBits, tagBits = mshrTagBits)
+        val bank = WireInit(0.U(bankBits.W))
+        val (tag_, set, modBank, bank_, offset) = parseAddress(x, modBankBits = 0, setBits = mshrSetBits, tagBits = mshrTagBits)
         if (!djparam.mpBlockBySet) {
             tag := tag_ // TODO: When !mpBlockBySet it must support useWayOH Check and RetryQueue
+            bank := bank_
         } else {
             require(sSetBits + sDirBankBits > mshrSetBits)
             tag := tag_(sSetBits + sDirBankBits - 1 - mshrSetBits, 0)
+            bank := 0.U
         }
         // return: [3:mshrTag] [2:mshrSet] [1:bank]
         (tag, set, bank)

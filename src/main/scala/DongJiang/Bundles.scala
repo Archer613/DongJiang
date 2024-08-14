@@ -85,11 +85,11 @@ trait HasMSHRSet extends DJBundle { this: Bundle => val mshrSet = UInt(mshrSetBi
 trait HasMSHRWay extends DJBundle { this: Bundle => val mshrWay = UInt(mshrWayBits.W) }
 
 // ---------------------------------------------------------------- Req To Slice Bundle ----------------------------------------------------------------------------- //
-trait HasReq2SliceBundle extends DJBundle with HasAddr { this: Bundle =>
+trait HasReqBaseMesBundle extends DJBundle { this: Bundle =>
     // CHI Id(Use in RnSlave)
     val srcIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
     val txnIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
-    // Snp Mes (Use in RnMaster)
+    // Snp Mes(Use in RnMaster)
     val isSnp       = Bool()
     val doNotGoToSD = Bool()
     val retToSrc    = Bool()
@@ -98,6 +98,10 @@ trait HasReq2SliceBundle extends DJBundle with HasAddr { this: Bundle =>
     // Other(Common)
     val willSnp     = Bool()
 }
+
+class ReqBaseMesBundle(implicit p: Parameters) extends DJBundle with HasReqBaseMesBundle with HasFromIDBits
+
+trait HasReq2SliceBundle extends DJBundle with HasReqBaseMesBundle with HasAddr
 
 class Req2SliceBundleWitoutXbarId(implicit p: Parameters) extends DJBundle with HasReq2SliceBundle
 
@@ -116,6 +120,8 @@ trait HasResp2NodeBundle extends DJBundle with HasCHIChannel { this: Bundle =>
     val resp        = UInt(ChiResp.width.W)
     // Indicate Requster final state in DCT
     val fwdStateOpt = if (djparam.useDCT) Some(UInt(ChiResp.width.W)) else None
+    // Let ReqBuf Req Send To Slice Retry
+    val reqRetry       = Bool()
 }
 
 class Resp2NodeBundleWitoutXbarId(implicit p: Parameters) extends DJBundle with HasResp2NodeBundle
@@ -193,7 +199,11 @@ class DBBundle(hasDBRCReq: Boolean = false)(implicit p: Parameters) extends DJBu
 
 
 // ---------------------------------------------------------------- DataBuffer Base Bundle ----------------------------------------------------------------------------- //
-class MpTaskBundle(implicit p: Parameters) extends DJBundle
+class MpTaskBundle(implicit p: Parameters) extends DJBundle with HasAddr {
+    val reqMes  = new ReqBaseMesBundle()
+    val respMes = new Resp2SliceBundleWitoutXbarId()
+    val respVal = Bool()
+}
 
 class UpdateMSHRBundle(implicit p: Parameters) extends DJBundle
 

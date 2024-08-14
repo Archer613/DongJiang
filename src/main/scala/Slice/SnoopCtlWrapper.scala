@@ -12,8 +12,6 @@ class SnoopCtlWrapper()(implicit p: Parameters) extends DJModule {
     val sliceId       = Input(UInt(bankBits.W))
     // MainPipe -> SnpCtrl
     val snpTask       = Flipped(Decoupled(new SnpTaskBundle()))
-    // snpCtrl -> MSHRCtl
-    val snpCtlValNum  = Output(UInt((snpCtlIdBits + 1).W))
     // snpCtrl -> RnNode
     val req2RnNode    = Decoupled(new Req2NodeBundle())
   })

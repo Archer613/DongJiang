@@ -53,6 +53,7 @@ import chisel3.util._
 
 /*
  * When it need Snoop or ReadDown, it need to decode twice, and the result is based on the second decode(decode1)
+ * It cant be Commit and Snoop / ReadDown at the same time
  */
 object decode {
     def decode0(opcode: UInt, srcState: UInt, othState: UInt, hnState: UInt): (Bundle, Bundle, Bundle, Bundle, Bool) = {

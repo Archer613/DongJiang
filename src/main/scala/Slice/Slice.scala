@@ -64,8 +64,6 @@ class Slice()(implicit p: Parameters) extends DJModule {
   mshrCtl.io.resp2Slice   <> fastArbDec(Seq(io.rnResp2Slice, io.snResp2Slice))
   mshrCtl.io.mpTask       <> mainPipe.io.mpTask
   mshrCtl.io.udpMSHR      <> mainPipe.io.udpMSHR
-  mshrCtl.io.mpReqValNum  := mpReqQueue.io.count
-  mshrCtl.io.snpCtlValNum := snpCtl.io.snpCtlValNum
 
 
   snpCtl.io.sliceId       := io.sliceId
@@ -88,11 +86,8 @@ class Slice()(implicit p: Parameters) extends DJModule {
   mpReq2SnNode.bits       := mpReqQueue.io.deq.bits
 
 
-  io.resp2RnNode          <> mpRespQueue.io.deq
+  io.resp2RnNode          <> fastPriorityArbDec(Seq(mshrCtl.io.retry2RnNode, mpRespQueue.io.deq))
   io.req2RnNode           <> fastPriorityArbDec(Seq(snpCtl.io.req2RnNode, mpReq2RnNode))
   io.req2SnNode           <> mpReq2SnNode
-
-
-
 
 }
