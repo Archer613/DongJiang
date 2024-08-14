@@ -12,6 +12,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tile.MaxHartIdBits
 import NHL2._
+import CHISN._
 import SimpleL2.Configs.L2ParamKey
 import SimpleL2.SimpleL2Cache
 import SimpleL2.Configs.L2Param
@@ -129,13 +130,10 @@ class TestTop_NHL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(impl
 
 // ----------------------------- Connect IO_SN <-> ARM_SN -------------------------- //
     val dongjiang = Module(new DongJiang())
-    val io = IO(new Bundle {
-      val snChi = Vec(dongjiang.djparam.nrBank, CHIBundleDownstream(dongjiang.chiParams))
-      val snChiLinkCtrl = Vec(dongjiang.djparam.nrBank, new CHILinkCtrlIO())
-    })
+    val chiSn     = Module(new CHISN())
 
-    dongjiang.io.snMasChi <> io.snChi
-    dongjiang.io.snMasChiLinkCtrl <> io.snChiLinkCtrl
+    dongjiang.io.snMasChi <> chiSn.io.hnChi
+    dongjiang.io.snMasChiLinkCtrl <> chiSn.io.hnLinkCtrl
 
     dongjiang.io.rnMasChi <> DontCare
     dongjiang.io.rnMasChiLinkCtrl <> DontCare
