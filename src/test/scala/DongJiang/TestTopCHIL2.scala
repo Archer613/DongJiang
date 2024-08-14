@@ -16,6 +16,7 @@ import coupledL2.prefetch._
 import coupledL2.tl2chi._
 import utility.{ChiselDB, FileRegisters, TLLogger, PerfCounterOptionsKey, PerfCounterOptions}
 import coupledL2._
+import CHISN._
 import xs.utils.perf.{DebugOptions, DebugOptionsKey}
 
 class TestTop_CHIL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(implicit p: Parameters) extends LazyModule
@@ -149,15 +150,13 @@ class TestTop_CHIL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(imp
       l2.module.io.l2_tlb_req <> DontCare
     }
 
-// ----------------------------- Connect IO_SN <-> ARM_SN -------------------------- //
+// ----------------------------- Connect IO_SN <-> CHI_SN -------------------------- //
     val dongjiang = Module(new DongJiang())
     val connecter = Seq.fill(numCores) { Module(new ConnectChil2()) }
-    val io = IO(new Bundle {
-      val snChi = Vec(dongjiang.djparam.nrBank, CHIBundleDownstream(dongjiang.chiParams))
-      val snChiLinkCtrl = Vec(dongjiang.djparam.nrBank, new CHILinkCtrlIO())
-    })
-    dongjiang.io.snMasChi <> io.snChi
-    dongjiang.io.snMasChiLinkCtrl <> io.snChiLinkCtrl
+    val chiSn     = Module(new CHISN())
+
+    dongjiang.io.snMasChi <> chiSn.io.hnChi
+    dongjiang.io.snMasChiLinkCtrl <> chiSn.io.hnLinkCtrl
 
     dontTouch(dongjiang.io)
     dontTouch(l2_nodes(0).module.io_chi)

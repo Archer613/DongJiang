@@ -128,7 +128,7 @@ class TestTop_NHL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(impl
 
     l2_nodes.foreach(_.module.io.nodeID := l2NodeID.U)
 
-// ----------------------------- Connect IO_SN <-> ARM_SN -------------------------- //
+// ----------------------------- Connect IO_SN <-> CHI_SN -------------------------- //
     val dongjiang = Module(new DongJiang())
     val chiSn     = Module(new CHISN())
 
