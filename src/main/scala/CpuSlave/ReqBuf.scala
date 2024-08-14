@@ -203,7 +203,7 @@ class ReqBuf()(implicit p: Parameters) extends DSUModule {
   /*
    * task or resp output
    */
-  io.mpTask.valid     := (fsmReg.s_wbReq2mp & !fsmReg.w_rnData) | fsmReg.s_req2mp
+  io.mpTask.valid     := ((fsmReg.s_wbReq2mp & !fsmReg.w_rnData) | fsmReg.s_req2mp) & !io.nestInMes.valid & !io.nestInMes.bits.block & RegNext(io.nestOutMes.valid)
   io.mpTask.bits      := taskReg
 
 
@@ -335,6 +335,7 @@ class ReqBuf()(implicit p: Parameters) extends DSUModule {
 // ---------------------------  Deal Nest Logic --------------------------------//
   io.nestOutMes.valid := !io.free
   io.nestOutMes.bits.nestAddr := taskReg.addr(addressBits - 1, offsetBits)
+  io.nestOutMes.bits.opcode   := taskReg.opcode
 
 
 

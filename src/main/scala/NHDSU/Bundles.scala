@@ -259,6 +259,7 @@ class DSReqEntry(implicit p: Parameters) extends DSUBundle with HasToIDBits {
 // ------------------- Nest Mes -------------------- //
 class NestOutMes(implicit p: Parameters) extends DSUBundle {
     val nestAddr = UInt((addressBits - offsetBits).W)
+    val opcode   = UInt(6.W)
 }
 
 class NestInMes(implicit p: Parameters) extends DSUBundle {
