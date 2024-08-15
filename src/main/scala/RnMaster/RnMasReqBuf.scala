@@ -317,6 +317,7 @@ class RnMasReqBuf(rnMasId: Int, reqBufId: Int)(implicit p: Parameters) extends D
   io.resp2Slice.valid           := (fsmReg.s_snpUdpMSHR | fsmReg.s_reqUdpMSHR) & PopCount(fsmReg.asUInt) === 1.U // only udpMSHR need to do
   io.resp2Slice.bits.resp       := reqRespReg
   io.resp2Slice.bits.isSnpResp  := false.B
+  io.resp2Slice.bits.hasData    := reqRespHasDataReg
   io.resp2Slice.bits.dbid       := dbidReg
   io.resp2Slice.bits.mshrSet    := parseMSHRAddress(reqReg.addr)._1
   if(djparam.useDCT) io.resp2Slice.bits.fwdStateOpt.get := DontCare

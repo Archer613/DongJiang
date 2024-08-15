@@ -119,6 +119,7 @@ trait HasDJParam {
     val nrRnNode        = djparam.rnNodeMes.length
     val nrRnSlv         = djparam.rnNodeMes.map(_.isSlave).count(_ == true)
     val nrRnMas         = djparam.rnNodeMes.map(_.isMaster).count(_ == true)
+    val rnSlvNodeIdBits = log2Ceil(nrRnSlv)
     val rnNodeIdBits    = log2Ceil(nrRnNode)
     val nrRnReqBufMax   = djparam.rnNodeMes.map(_.nrReqBuf).max
     val rnReqBufIdBits  = log2Ceil(nrRnReqBufMax)
@@ -206,11 +207,11 @@ trait HasDJParam {
         (tag(tagBits - 1, 0), set(setBits - 1, 0), modBank(modBankBits - 1, 0), bank(bankBits - 1, 0), offset(offsetBits - 1, 0))
     }
 
-    def parseMSHRAddress(x: UInt): (UInt, UInt, UInt) = {
+    def parseMSHRAddress(x: UInt, mpBlockBySet: Boolean = false): (UInt, UInt, UInt) = {
         val tag = WireInit(0.U(mshrTagBits.W))
         val bank = WireInit(0.U(bankBits.W))
         val (tag_, set, modBank, bank_, offset) = parseAddress(x, modBankBits = 0, setBits = mshrSetBits, tagBits = mshrTagBits)
-        if (!djparam.mpBlockBySet) {
+        if (mpBlockBySet) {
             tag := tag_ // TODO: When !mpBlockBySet it must support useWayOH Check and RetryQueue
             bank := bank_
         } else {

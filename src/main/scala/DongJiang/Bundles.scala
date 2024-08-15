@@ -23,10 +23,11 @@ object IdL0 {
 class IDBundle(implicit p: Parameters) extends DJBundle {
     val idL0 = UInt(IdL0.width.W) // Module: IDL0 [3.W]
     val idL1 = UInt(max(rnNodeIdBits, bankBits).W) // SubModule: RnSlave, RnMaster, Slices
-    val idL2 = UInt(max(rnReqBufIdBits, max(snReqBufIdBits, mshrWayBits)).W) // SubSubModule: RnReqBufs, SnReqBufs, mshrWays
+    val idL2 = UInt(max(rnReqBufIdBits, max(snReqBufIdBits, max(mshrWayBits, rnSlvNodeIdBits))).W)// SubSubModule: RnReqBufs, SnReqBufs, mshrWays, rnSlvId
 
     def mshrWay  = idL2
     def reqBufId = idL2
+    def rnSlvId  = idL2
 
     def isSLICE  = idL0 === IdL0.SLICE
     def isRNSLV  = idL0 === IdL0.RNSLV
@@ -121,10 +122,11 @@ class Req2NodeBundle(implicit p: Parameters) extends DJBundle with HasReq2NodeBu
 // ---------------------------------------------------------------- Resp To Slice Bundle ----------------------------------------------------------------------------- //
 trait HasResp2SliceBundle extends DJBundle with HasDBID with HasMSHRSet { this: Bundle =>
     val isSnpResp   = Bool()
+    val hasData     = Bool()
     // Indicate Snoopee final state
     val resp        = UInt(ChiResp.width.W)
     // Indicate Requster final state in DCT
-    val fwdStateOpt = if (djparam.useDCT) Some(UInt(ChiResp.width.W)) else None
+    val fwdStateOpt = if (djparam.useDCT) Some(Valid(UInt(ChiResp.width.W))) else None
 }
 
 class Resp2SliceBundleWitoutXbarId(implicit p: Parameters) extends DJBundle with HasResp2SliceBundle
@@ -167,16 +169,16 @@ class DBBundle(hasDBRCReq: Boolean = false)(implicit p: Parameters) extends DJBu
 
 // ---------------------------------------------------------------- DataBuffer Base Bundle ----------------------------------------------------------------------------- //
 class MpTaskBundle(implicit p: Parameters) extends DJBundle with HasAddr {
-    val reqMes  = new ReqBaseMesBundle()
-    val respMes = new Resp2SliceBundleWitoutXbarId()
-    val respVal = Bool()
+    // TODO
 }
 
 class UpdateMSHRBundle(implicit p: Parameters) extends DJBundle
 
 class DSTaskBundle(implicit p: Parameters) extends DJBundle
 
-class DirReadBundle(implicit p: Parameters) extends DJBundle
+class DirReadBundle(implicit p: Parameters) extends DJBundle with HasAddr {
+    // TODO
+}
 
 class DirRespBundle(implicit p: Parameters) extends DJBundle
 
