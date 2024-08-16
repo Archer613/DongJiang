@@ -174,17 +174,37 @@ class MpTaskBundle(implicit p: Parameters) extends DJBundle with HasAddr {
 
 class UpdateMSHRBundle(implicit p: Parameters) extends DJBundle
 
+class SnpTaskBundle(implicit p: Parameters) extends DJBundle
+
 class DSTaskBundle(implicit p: Parameters) extends DJBundle
 
-class DirReadBundle(implicit p: Parameters) extends DJBundle with HasAddr {
-    // TODO
+class DirReadBundle(implicit p: Parameters) extends DJBundle with HasAddr
+
+class DirRespBaseBundle(nrWays: Int, nrMetas: Int, replWayBits: Int)(implicit p: Parameters) extends DJBundle with HasAddr {
+    val hit         = Bool()
+    val wayOH       = UInt(nrWays.W)
+    val metaVec     = Vec(nrMetas, new CHIStateBundle())
+    val replMes     = UInt(replWayBits.W)
 }
 
-class DirRespBundle(implicit p: Parameters) extends DJBundle
+class DirRespBundle(implicit p: Parameters) extends DJBundle {
+    val s   = new DirRespBaseBundle(djparam.selfWays, 1, sReplWayBits) // self
+    val sf  = new DirRespBaseBundle(djparam.sfDirWays, nrRnSlv, sfReplWayBits) // snoop filter
+}
 
-class DirWriteBundle(implicit p: Parameters) extends DJBundle
+class DirWriteBaseBundle(nrWays: Int, nrMetas: Int, replWayBits: Int)(implicit p: Parameters) extends DJBundle with HasAddr {
+    val wayOH       = UInt(nrWays.W)
+    val metaVec     = Vec(nrMetas, new CHIStateBundle())
+    val replMes     = UInt(replWayBits.W)
+}
 
-class SnpTaskBundle(implicit p: Parameters) extends DJBundle
+class DirWriteBundle(implicit p: Parameters) extends DJBundle {
+    val s   = Decoupled(new DirWriteBaseBundle(djparam.selfWays, 1, sReplWayBits)) // self
+    val sf  = Decoupled(new DirWriteBaseBundle(djparam.sfDirWays, nrRnSlv, sfReplWayBits)) // snoop filter
+}
+
+
+
 
 
 

@@ -89,13 +89,13 @@ case class DJParam(
                     dsMulticycle: Int = 2,
                     dsHoldMcp: Boolean = true,
                     selfReplacementPolicy: String = "plru",
-                    // snoop(client) dir mes
-                    nrClientDirBank: Int = 2,
-                    clientDirWays: Int = 4,
-                    clientDirSets: Int = 32,
-                    clientDirMulticycle: Int = 2,
-                    clientDirHoldMcp: Boolean = true,
-                    clientReplacementPolicy: String = "plru",
+                    // snoop filter dir mes
+                    nrSFDirBank: Int = 2,
+                    sfDirWays: Int = 4,
+                    sfDirSets: Int = 32,
+                    sfDirMulticycle: Int = 2,
+                    sfDirHoldMcp: Boolean = true,
+                    sfReplacementPolicy: String = "plru",
                   ) {
     require(rnNodeMes.length > 0)
     require(nrMpTaskQueue > 0)
@@ -104,9 +104,9 @@ case class DJParam(
     require(nrMSHRSets <= selfSets)
     require(nrBank == 1 | nrBank == 2 | nrBank == 4)
     require(snNodeMes.length == nrBank)
-    require(nrMSHRWays <= min(selfWays, clientDirWays))
+    require(nrMSHRWays <= min(selfWays, sfDirWays))
     require(selfReplacementPolicy == "random" || selfReplacementPolicy == "plru")
-    require(clientReplacementPolicy == "random" || clientReplacementPolicy == "plru")
+    require(sfReplacementPolicy == "random" || sfReplacementPolicy == "plru")
 }
 
 trait HasDJParam {
@@ -151,12 +151,12 @@ trait HasDJParam {
     val sSetBits        = log2Ceil(djparam.selfSets/djparam.nrSelfDirBank)
     val sTagBits        = djparam.addressBits - sSetBits - sDirBankBits - bankBits - offsetBits
 
-    // CLIENT DIR Parameters: [cTag] + [cSet] + [cDirBank] + [bank] + [offset]
-    // [cSet] + [cDirBank] = [clientSetsBits]
-    val cWayBits        = log2Ceil(djparam.clientDirWays)
-    val cDirBankBits    = log2Ceil(djparam.nrClientDirBank)
-    val cSetBits        = log2Ceil(djparam.clientDirSets / djparam.nrClientDirBank)
-    val cTagBits        = djparam.addressBits - cSetBits - cDirBankBits - bankBits - offsetBits
+    // SF DIR Parameters: [cTag] + [cSet] + [cDirBank] + [bank] + [offset]
+    // [sfSet] + [sfDirBank] = [sfSetsBits]
+    val sfWayBits       = log2Ceil(djparam.sfDirWays)
+    val sfDirBankBits   = log2Ceil(djparam.nrSFDirBank)
+    val sfSetBits       = log2Ceil(djparam.sfDirSets / djparam.nrSFDirBank)
+    val sfTagBits       = djparam.addressBits - sfSetBits - sfDirBankBits - bankBits - offsetBits
 
     // DS Parameters
     val dsWayBits       = sWayBits
@@ -168,12 +168,10 @@ trait HasDJParam {
     val mshrTagBits     = djparam.addressBits - mshrSetBits - bankBits - offsetBits
 
     // replacement Parameters
-    val sUseRepl        = djparam.selfReplacementPolicy != "random"
-    val sReplWayBits    = djparam.selfWays - 1
-    val cUseRepl        = djparam.clientReplacementPolicy != "random"
-    val cReplWayBits    = djparam.clientDirWays - 1
+    val sReplWayBits    = if(djparam.selfReplacementPolicy != "random") djparam.selfWays - 1 else 0
+    val sfReplWayBits   = if(djparam.sfReplacementPolicy != "random") djparam.sfDirWays - 1 else 0
     require(djparam.selfReplacementPolicy == "random" | djparam.selfReplacementPolicy == "plru", "It should modify sReplWayBits when use replacement except of random or plru")
-    require(djparam.clientReplacementPolicy == "random" | djparam.clientReplacementPolicy == "plru", "It should modify cReplWayBits when use replacement except of random or plru")
+    require(djparam.sfReplacementPolicy == "random" | djparam.sfReplacementPolicy == "plru", "It should modify cReplWayBits when use replacement except of random or plru")
 
     // Node address id map check
     // TODO

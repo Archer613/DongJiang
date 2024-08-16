@@ -17,7 +17,7 @@ class MainPipe()(implicit p: Parameters) extends DJModule {
     // Resp From Directory
     val dirResp     = Flipped(Decoupled(new DirRespBundle()))
     // Write Req To Directory
-    val dirWrite    = Decoupled(new DirWriteBundle())
+    val dirWrite    = new DirWriteBundle()
     // Task From MSHR
     val mpTask      = Flipped(Decoupled(new MpTaskBundle()))
     // Update Task To MSHR

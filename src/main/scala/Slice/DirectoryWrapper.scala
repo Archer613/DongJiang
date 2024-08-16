@@ -16,7 +16,7 @@ val io = IO(new Bundle {
   val sliceId     = Input(UInt(bankBits.W))
   val dirRead     = Flipped(Decoupled(new DirReadBundle()))
   val dirResp     = Decoupled(new DirRespBundle())
-  val dirWrite    = Flipped(Decoupled(new DirWriteBundle()))
+  val dirWrite    = Flipped(new DirWriteBundle())
 })
 
   // TODO: Delete the following code when the coding is complete
