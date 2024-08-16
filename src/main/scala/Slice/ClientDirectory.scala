@@ -247,7 +247,7 @@ val io = IO(new Bundle {
     assert(!(readPipe.io.deq.valid ^ replPipeOpt.get.io.deq.valid), "Must get meta and repl at the same time in S2")
   }
   // s3
-  assert(PopCount(hitVec) <= 1.U)
+  assert(PopCount(hitWayVec) <= 1.U)
   assert(Mux(io.dirResp.valid, io.dirResp.ready, true.B))
 
 
