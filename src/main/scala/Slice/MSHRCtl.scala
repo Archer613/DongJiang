@@ -60,8 +60,8 @@ class MSHRCtl()(implicit p: Parameters) extends DJModule {
 
 // --------------------- Reg / Wire declaration ------------------------//
   // mshrTable
-  val mshrTableReg    = RegInit(VecInit(Seq.fill(djparam.nrMSHRSet) { VecInit(Seq.fill(djparam.mrMSHRWay) { 0.U.asTypeOf(new MSHREntry()) }) }))
-  val mshrLockVecReg  = RegInit(VecInit(Seq.fill(djparam.nrMSHRSet) { false.B }))
+  val mshrTableReg    = RegInit(VecInit(Seq.fill(djparam.nrMSHRSets) { VecInit(Seq.fill(djparam.nrMSHRWays) { 0.U.asTypeOf(new MSHREntry()) }) }))
+  val mshrLockVecReg  = RegInit(VecInit(Seq.fill(djparam.nrMSHRSets) { false.B }))
   // Transfer Req From Node To MSHREntry
   val mshrAlloc_s0    = WireInit(0.U.asTypeOf(new MSHREntry()))
   // retry mes

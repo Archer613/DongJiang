@@ -73,8 +73,8 @@ case class DJParam(
                     nrMpRespQueue: Int = 4,
                     mpBlockBySet: Boolean = true,
                     // MSHR
-                    nrMSHRSet: Int = 4,
-                    mrMSHRWay: Int = 8,
+                    nrMSHRSets: Int = 4,
+                    nrMSHRWays: Int = 4,
                     // number of bank or buffer
                     nrBank: Int = 2,
                     nrSnpCtl: Int = 16,
@@ -84,23 +84,27 @@ case class DJParam(
                     nrSelfDirBank: Int = 2,
                     selfWays: Int = 4,
                     selfSets: Int = 32,
-                    selfDirMulticycle: Int = 1,
-                    dsMulticycle: Int = 1,
+                    selfDirMulticycle: Int = 2,
+                    selfDirHoldMcp: Boolean = true,
+                    dsMulticycle: Int = 2,
+                    dsHoldMcp: Boolean = true,
                     selfReplacementPolicy: String = "plru",
                     // snoop(client) dir mes
                     nrClientDirBank: Int = 2,
                     clientDirWays: Int = 4,
                     clientDirSets: Int = 32,
-                    clientDirMulticycle: Int = 2, // TODO: data holdMcp
+                    clientDirMulticycle: Int = 2,
+                    clientDirHoldMcp: Boolean = true,
                     clientReplacementPolicy: String = "plru",
                   ) {
     require(rnNodeMes.length > 0)
     require(nrMpTaskQueue > 0)
     require(nrMpReqQueue > 0)
     require(nrMpRespQueue > 0)
-    require(nrMSHRSet <= selfSets)
+    require(nrMSHRSets <= selfSets)
     require(nrBank == 1 | nrBank == 2 | nrBank == 4)
     require(snNodeMes.length == nrBank)
+    require(nrMSHRWays <= min(selfWays, clientDirWays))
     require(selfReplacementPolicy == "random" || selfReplacementPolicy == "plru")
     require(clientReplacementPolicy == "random" || clientReplacementPolicy == "plru")
 }
@@ -159,8 +163,8 @@ trait HasDJParam {
     val dsSetBits       = sSetBits
 
     // MSHR TABLE Parameters: [mshrTag] + [mshrSet] + [bank] + [offset]
-    val mshrWayBits     = log2Ceil(djparam.mrMSHRWay)
-    val mshrSetBits     = log2Ceil(djparam.nrMSHRSet)
+    val mshrWayBits     = log2Ceil(djparam.nrMSHRWays)
+    val mshrSetBits     = log2Ceil(djparam.nrMSHRSets)
     val mshrTagBits     = djparam.addressBits - mshrSetBits - bankBits - offsetBits
 
     // replacement Parameters
