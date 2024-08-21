@@ -40,6 +40,7 @@ class IDBundle(implicit p: Parameters) extends DJBundle {
 trait HasFromIDBits extends DJBundle { this: Bundle => val from = new IDBundle() }
 
 trait HasToIDBits extends DJBundle { this: Bundle => val to = new IDBundle() }
+
 class ToIDBundle(implicit p: Parameters) extends DJBundle with HasToIDBits
 
 trait HasIDBits extends DJBundle with HasFromIDBits with HasToIDBits
@@ -51,6 +52,8 @@ trait HasAddr extends DJBundle { this: Bundle => val addr = UInt(addressBits.W) 
 trait HasMSHRSet extends DJBundle { this: Bundle => val mshrSet = UInt(mshrSetBits.W) }
 
 trait HasMSHRWay extends DJBundle { this: Bundle => val mshrWay = UInt(mshrWayBits.W) }
+
+class MSHRIndexBundle(implicit p: Parameters) extends DJBundle with HasMSHRSet with HasMSHRWay
 
 // ---------------------------------------------------------------- Req To Slice Bundle ----------------------------------------------------------------------------- //
 trait HasReqBaseMesBundle extends DJBundle { this: Bundle =>
@@ -178,13 +181,14 @@ class SnpTaskBundle(implicit p: Parameters) extends DJBundle
 
 class DSTaskBundle(implicit p: Parameters) extends DJBundle
 
-class DirReadBundle(implicit p: Parameters) extends DJBundle with HasAddr
+class DirReadBundle(implicit p: Parameters) extends DJBundle with HasAddr with HasMSHRWay
 
 class DirRespBaseBundle(nrWays: Int, nrMetas: Int, replWayBits: Int)(implicit p: Parameters) extends DJBundle with HasAddr {
     val hit         = Bool()
     val wayOH       = UInt(nrWays.W)
     val metaVec     = Vec(nrMetas, new CHIStateBundle())
     val replMes     = UInt(replWayBits.W)
+    val replRetry   = Bool()
 }
 
 class DirRespBundle(implicit p: Parameters) extends DJBundle {
