@@ -9,48 +9,69 @@ import scala.math.{max, min}
 case object DJParamKey extends Field[DJParam](DJParam())
 
 
-// RN Node Params, used for generation
-case class RnNodeParam
+// Node Interface Params, used for generation
+case class InterfaceParam
 (
-    name: String = "RnSalve",
+    // BASE
+    name: String, // RNSLAVE / RNMASTER / SNMASTER
     nrReqBuf: Int = 16,
-    isSlave: Boolean = true,
-    addressId: Int = 0,
-    addressIdBits: Int = 0,
-    peferTgtIdMap: Option[Seq[Int]] = None,
+    isRn: Boolean,
+    isSlave: Boolean,
+    // Use In Master
+    addressId: Option[Int] = None,
+    addressIdBits: Option[Int] = None,
+    // Use In Slave
+    preferTgtIdMap: Option[Seq[Int]] = None,
+    // IO
+    useValidReadyIO: Boolean = false,
     aggregateIO: Boolean = false,
-    // can receive or send chi lcrd num
-    nrRnTxLcrdMax: Int = 4,
-    nrRnRxLcrdMax: Int = 4,
+    nrTxLcrdMax: Int = 4, // can receive or send chi lcrd num
+    nrRxLcrdMax: Int = 4, // can receive or send chi lcrd num
 ) {
+    val isSn = !isRn
     val isMaster = !isSlave
     val hasReq2Slice = true
     val hasDBRCReq = isMaster
-    require(nrRnTxLcrdMax <= 15)
-    require(nrRnRxLcrdMax <= 15)
+    require(nrTxLcrdMax <= 15)
+    require(nrRxLcrdMax <= 15)
+    require(addressId.nonEmpty | isSlave)
+    if(isMaster) require(addressId.nonEmpty)      else require(addressId.isEmpty)
+    if(isMaster) require(addressIdBits.nonEmpty)  else require(addressIdBits.isEmpty)
+    if(isSlave)  require(preferTgtIdMap.nonEmpty) else require(preferTgtIdMap.isEmpty)
 }
 
-
-// SN Node Params, used for generation
-case class SnNodeParam
+// Node Param In Local Ring
+case class NodeParam
 (
-    name: String = "SnMaster",
-    nrReqBuf: Int = 16,
-    addressBits: Int = 48,
-    addressId: Int = 0,
-    addressIdBits: Int = 0,
-    aggregateIO: Boolean = false,
-    // can receive or send chi lcrd num
-    nrSnTxLcrdMax: Int = 4,
-    nrSnRxLcrdMax: Int = 4,
-
+  name: String = "Node",
+  nodeId: Int,
+  isRN: Boolean = false,
+  isHN: Boolean = false,
+  isSN: Boolean = false,
+  isDDR: Boolean = false,
+  useDCT: Boolean = false,
+  useDMT: Boolean = false,
+  useDWT: Boolean = false,
+  bankId: Option[Int] = None, // Only Use In isSN and !isDDR
+  bankIdBits: Option[Int] = None, // Only Use In isSN and !isDDR
+  addressId: Option[Int] = None, // Only Use In isHN or isSN and isDDR
+  addressIdBits: Option[Int] = None, // Only Use In isHN or isSN and sisDDR
 ) {
-    val isSlave = false
-    val isMaster = !isSlave // SN be Master forever
-    val hasReq2Slice = false
-    val hasDBRCReq = true // must be true when its master
-    require(nrSnTxLcrdMax <= 15)
-    require(nrSnRxLcrdMax <= 15)
+    val tpyes = Seq(isRN, isHN, isSN)
+    require(tpyes.count(_ == true) == 1)
+    if(isRN) require(!isDDR)
+    if(isHN) require(!isDDR); require(!useDCT); require(!useDMT); require(!useDWT)
+    if(isSN) require(!useDCT)
+    if(isSN & !isDDR) {
+        require(bankId.nonEmpty); require(bankIdBits.nonEmpty)
+    } else {
+        require(bankId.isEmpty); require(bankIdBits.isEmpty)
+    }
+    if(isHN | (isSN & isDDR)) {
+        require(addressId.nonEmpty); require(addressIdBits.nonEmpty)
+    }else {
+        require(addressId.isEmpty); require(addressIdBits.isEmpty)
+    }
 }
 
 
@@ -60,13 +81,19 @@ case class DJParam(
                     beatBytes: Int = 32,
                     addressBits: Int = 48,
                     hasLLC: Boolean = true,
-                    useInNoc: Boolean = false,
-                    useDCT: Boolean = false, // Dont open it when useInNoc is false
-                    // ------------------------- Rn / Sn Base Mes -------------------- //
-                    rnNodeMes: Seq[RnNodeParam] = Seq(RnNodeParam( name = "RnSalve_0" ),
-                                                      RnNodeParam( name = "RnMaster_0", isSlave = false)),
-                    snNodeMes: Seq[SnNodeParam] = Seq(SnNodeParam( name = "SnMaster_0" ),
-                                                      SnNodeParam( name = "SnMaster_1" )),
+                    // ------------------------- Interface Mes -------------------- //
+                    interfaceMes: Seq[InterfaceParam] = Seq(InterfaceParam( name = "RnSalve_LOCAL",  isRn = true,   isSlave = true,  preferTgtIdMap = Some(Seq(2, 3)) ),
+                                                            InterfaceParam( name = "SnMaster_LOCAL", isRn = false,  isSlave = false, addressId = Some(0), addressIdBits = Some(1) ),
+                                                            InterfaceParam( name = "RnSalve_CSN",    isRn = true,   isSlave = true,  preferTgtIdMap = Some(Seq(0)) ),
+                                                            InterfaceParam( name = "RnMaster_CSN",   isRn = true,   isSlave = false, addressId = Some(1), addressIdBits = Some(1) )),
+                    // ------------------------- Node Mes -------------------- //
+                    nodeMes: Seq[NodeParam] = Seq(  NodeParam( name = "RN_CSN",     nodeId = 0, isRN = true ),
+                                                    NodeParam( name = "HN_CSN",     nodeId = 1, isHN = true, addressId = Some(1), addressIdBits = Some(1) ),
+                                                    NodeParam( name = "RN_LOCAL_0", nodeId = 2, isRN = true ),
+                                                    NodeParam( name = "RN_LOCAL_1", nodeId = 3, isRN = true ),
+                                                    NodeParam( name = "SN_LOCAL_0", nodeId = 5, isRN = true, bankId = Some(0), bankIdBits = Some(1) ),
+                                                    NodeParam( name = "SN_LOCAL_1", nodeId = 6, isRN = true, bankId = Some(1), bankIdBits = Some(1) ),
+                                                    NodeParam( name = "SN_DDR",     nodeId = 7, isRN = true, isDDR = true, addressId = Some(0), addressIdBits = Some(1))),
                     // ------------------------ Slice Base Mes ------------------ //
                     nrMpTaskQueue: Int = 4,
                     nrMpReqQueue: Int = 4,
@@ -79,15 +106,13 @@ case class DJParam(
                     nrBank: Int = 2,
                     nrSnpCtl: Int = 16,
                     nrDataBuf: Int = 16,
-                    // ------------------------ Directory * DataStorage Mes ------------------ //
+                    // ------------------------ Directory Mes ------------------ //
                     // self dir & ds mes, dont care when hasLLC is false
                     nrSelfDirBank: Int = 2,
                     selfWays: Int = 4,
                     selfSets: Int = 32,
                     selfDirMulticycle: Int = 2,
                     selfDirHoldMcp: Boolean = true,
-                    dsMulticycle: Int = 2,
-                    dsHoldMcp: Boolean = true,
                     selfReplacementPolicy: String = "plru",
                     // snoop filter dir mes
                     nrSFDirBank: Int = 2,
@@ -97,13 +122,13 @@ case class DJParam(
                     sfDirHoldMcp: Boolean = true,
                     sfReplacementPolicy: String = "plru",
                   ) {
-    require(rnNodeMes.length > 0)
+    require(interfaceMes.nonEmpty)
+    require(nodeMes.nonEmpty)
     require(nrMpTaskQueue > 0)
     require(nrMpReqQueue > 0)
     require(nrMpRespQueue > 0)
     require(nrMSHRSets <= selfSets)
     require(nrBank == 1 | nrBank == 2 | nrBank == 4)
-    require(snNodeMes.length == nrBank)
     require(nrMSHRWays <= min(selfWays, sfDirWays))
     require(selfReplacementPolicy == "random" || selfReplacementPolicy == "plru")
     require(sfReplacementPolicy == "random" || sfReplacementPolicy == "plru")
@@ -119,17 +144,21 @@ trait HasDJParam {
     val dataBits        = djparam.blockBytes * 8
     val beatBits        = djparam.beatBytes * 8
 
-    // RN Parameters
-    val nrRnNode        = djparam.rnNodeMes.length
-    val nrRnSlv         = djparam.rnNodeMes.map(_.isSlave).count(_ == true)
-    val nrRnMas         = djparam.rnNodeMes.map(_.isMaster).count(_ == true)
-    val rnSlvNodeIdBits = log2Ceil(nrRnSlv)
-    val rnNodeIdBits    = log2Ceil(nrRnNode)
-    val nrRnReqBufMax   = djparam.rnNodeMes.map(_.nrReqBuf).max
-    val rnReqBufIdBits  = log2Ceil(nrRnReqBufMax)
-
-    // SN Parameters
-    val snReqBufIdBits  = log2Ceil(djparam.snNodeMes.map(_.nrReqBuf).max)
+    // Base Interface Mes
+    val nrIntf          = djparam.interfaceMes.length
+    val nrRnSlv         = djparam.interfaceMes.map{ case i => i.isRn & i.isSlave }.count(_ == true)
+    val nrRnMas         = djparam.interfaceMes.map{ case i => i.isRn & i.isMaster }.count(_ == true)
+    val nrSnSlv         = djparam.interfaceMes.map{ case i => i.isSn & i.isSlave }.count(_ == true)
+    val nrSnMas         = djparam.interfaceMes.map{ case i => i.isSn & i.isMaster }.count(_ == true)
+    val nrSlave         = nrRnSlv + nrSnSlv
+    val nrMaster        = nrRnMas + nrSnMas
+    val rnslvIdBits     = log2Ceil(nrRnSlv)
+    val nrReqBufMax     = djparam.interfaceMes.map(_.nrReqBuf).max
+    val reqBufIdBits    = log2Ceil(nrReqBufMax)
+    require(nrRnSlv >= 1)
+    require(nrRnMas <= 1)
+    require(nrSnSlv == 0)
+    require(nrSnMas <= 1)
 
     // Slice Queue
     val mpTaskQBits     = log2Ceil(djparam.nrMpTaskQueue)
@@ -137,7 +166,6 @@ trait HasDJParam {
     val mpRespQBits     = log2Ceil(djparam.nrMpRespQueue)
 
     // Slice Id Bits Parameters
-    val snpCtlIdBits    = log2Ceil(djparam.nrSnpCtl)
     val dbIdBits        = log2Ceil(djparam.nrDataBuf)
 
     // DIR BASE Parameters
@@ -182,7 +210,6 @@ trait HasDJParam {
     val TIMEOUT_BT      = 8000  // BlockTable
     val TIMEOUT_MP      = 8000  // MainPipe
     val TIMEOUT_SNP     = 8000  // SnoopCtl
-    val TIMEOUT_DS      = 6000  // DataStorage
     val TIMEOUT_RC      = 6000  // ReadCtl
     val TIMEOUT_TXD     = 1000  // SnChiTxDat
 
@@ -192,11 +219,11 @@ trait HasDJParam {
         addressBits = addressBits,
         dataBits = beatBits,
         dataCheck = false,
-        snpHasTgtId = djparam.useInNoc
+        snpHasTgtId = true
     )
 
     // some requirements
-    require(rnReqBufIdBits <= chiParams.txnidBits & snReqBufIdBits <= chiParams.txnidBits)
+    require(nrReqBufMax <= chiParams.txnidBits)
     require(dbIdBits <= chiParams.dbidBits)
 
     def parseAddress(x: UInt, modBankBits: Int = 1, setBits: Int = 1, tagBits: Int = 1): (UInt, UInt, UInt, UInt, UInt) = {
