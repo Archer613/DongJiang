@@ -87,6 +87,7 @@ val io = IO(new Bundle {
   val selInvWayVec    = Wire(Vec(ways, Bool()))
   val replWay         = WireInit(0.U(wayBits.W))
   val invMetas        = Wire(Vec(dsuparam.nrCore, new CHIStateBundle()))
+  val hitVec          = Wire(Vec(dsuparam.nrCore, Bool()))
 
 
 // ------------------------------ S1: Read / Write SRAM -----------------------------------//
@@ -177,8 +178,8 @@ val io = IO(new Bundle {
   val stateHitVec = metaResp_s3_g.map(_.metas.map(!_.isInvalid).reduce(_ | _))
   val hitMetas    = metaResp_s3_g(OHToUInt(hitWayVec)).metas
   val hit         = hitWayVec.asUInt.orR
-  val hitVec      = hitMetas.map(!_.isInvalid)
-  hitWayVec       := tagHitVec.zip(bankHitVec.zip(stateHitVec)).map{ case(t, (b, s)) => t & b & s }
+  hitVec         := hitMetas.map(!_.isInvalid)
+  hitWayVec      := tagHitVec.zip(bankHitVec.zip(stateHitVec)).map{ case(t, (b, s)) => t & b & s }
 
 
   /*
@@ -211,7 +212,7 @@ val io = IO(new Bundle {
    * Output Resp
    */
   io.dirResp.valid        := valid_s3_g
-  io.dirResp.bits.hitVec  := hitVec
+  io.dirResp.bits.hitVec  := Mux(hit, hitVec, 0.U.asTypeOf(hitVec))
   // [Resp Mes]                       [Hit Way Mes]                      [Invalid Way Mes]                      [Unuse Way Mes]                     [Replace Way Mes]
   io.dirResp.bits.wayOH   := Mux(hit, hitWayVec.asUInt,   Mux(hasInvWay, selInvWayVec.asUInt, Mux(replConflict, UIntToOH(selUnuseWay),              UIntToOH(replWay))))
   io.dirResp.bits.tag     := Mux(hit, dirRead_s3_g.tag,   Mux(hasInvWay, 0.U,                 Mux(replConflict, metaResp_s3_g(selUnuseWay).tag,     metaResp_s3_g(replWay).tag)))
