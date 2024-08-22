@@ -140,6 +140,8 @@ class ReqBuf()(implicit p: Parameters) extends DSUModule {
     snpRespReg.resp := Mux(io.chi.txrsp.fire, rsp.resp, dat.resp)
     snpRespReg.hasData := snpRetToSrcReg
     snpRespReg.dbid := dbidReg // TODO: clean dataBuffer when snpRetToSrc bug get txrsp
+    snpRespReg.to.idL2 := taskReg.from.idL2
+    // snpRespReg.from.idL1
   }
 
 
