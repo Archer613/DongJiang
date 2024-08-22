@@ -304,7 +304,7 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
   io.dbRCReq.bits.to := task_s3_g.bits.to
   io.dbRCReq.bits.dbid := task_s3_g.bits.dbid
   io.dbRCReq.bits.isRead := !task_s3_g.bits.isSnpHlp
-  io.dbRCReq.bits.isClean := !rwDS // snoop data will be clean by DS
+  io.dbRCReq.bits.isClean := !wDS // snoop data will be clean by DS
 
 
   /*

@@ -197,6 +197,17 @@ class DataBuffer()(implicit p: Parameters) extends DSUModule {
           db.state      := Mux(hit & readDone, Mux(db.needClean, DBState.FREE, DBState.READ_DONE), DBState.READING)
           db.beatRNum   := db.beatRNum + hit.asUInt
         }
+        is(DBState.READ_DONE){
+          val dsHit     = io.dsRCReq.valid & io.dsRCReq.bits.dbid === i.U
+          val needClean = Mux(dsHit, io.dsRCReq.bits.isClean, db.needClean)
+          val to        = Mux(dsHit, io.dsRCReq.bits.to, db.to)
+          val needRead  = dsHit & io.dsRCReq.bits.isRead
+          db.state     := Mux(dsHit, Mux(needRead, DBState.READ, DBState.FREE), DBState.WRITE_DONE)
+          db.to        := to
+          db.beatRNum  := 0.U
+          db.needClean := needClean
+          
+        }
       }
   }
 
