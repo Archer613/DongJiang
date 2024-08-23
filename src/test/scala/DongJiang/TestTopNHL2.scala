@@ -12,7 +12,6 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tile.MaxHartIdBits
 import NHL2._
-import CHISN._
 import SimpleL2.Configs.L2ParamKey
 import SimpleL2.SimpleL2Cache
 import SimpleL2.Configs.L2Param
@@ -111,9 +110,9 @@ class TestTop_NHL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(impl
     bankBinders(i) :*= l1xbar
   }
 
-  lazy val module = new LazyModuleImp(this){
+  lazy val module = new LazyModuleImp(this) {
 
-    l1d_nodes.zipWithIndex.foreach{
+    l1d_nodes.zipWithIndex.foreach {
       case (node, i) =>
         node.makeIOs()(ValName(s"master_port_$i"))
     }
@@ -128,18 +127,11 @@ class TestTop_NHL2(numCores: Int = 1, numULAgents: Int = 0, banks: Int = 1)(impl
 
     l2_nodes.foreach(_.module.io.nodeID := l2NodeID.U)
 
-// ----------------------------- Connect IO_SN <-> ARM_SN -------------------------- //
+    l2_nodes.foreach(_.module.io.chi <> DontCare)
+    l2_nodes.foreach(_.module.io.chiLinkCtrl <> DontCare)
+
     val dongjiang = Module(new DongJiang())
-    val chiSn     = Module(new CHISN())
-
-    dongjiang.io.snMasChi <> chiSn.io.hnChi
-    dongjiang.io.snMasChiLinkCtrl <> chiSn.io.hnLinkCtrl
-
-    dongjiang.io.rnMasChi <> DontCare
-    dongjiang.io.rnMasChiLinkCtrl <> DontCare
-
-    dongjiang.io.rnSlvChi.zipWithIndex.foreach { case(chi, i) => chi <> l2_nodes(i).module.io.chi }
-    dongjiang.io.rnSlvChiLinkCtrl.zipWithIndex.foreach { case(ctrl, i) => ctrl <> l2_nodes(i).module.io.chiLinkCtrl }
+    dongjiang.io <> DontCare
   }
 
 }
@@ -150,23 +142,12 @@ object TestTopNHHelper {
     val FPGAPlatform    = false
     val enableChiselDB  = false
 
-    def createRnNode(name: String) = {
-      val rnNode = new RnNodeParam(
-        name = name,
-      )
-      rnNode
-    }
-    val rnNodeSeq = (0 until nrCore).map(i => createRnNode(s"RnSlave$i"))
-
     val config = new Config((_, _, _) => {
       case L2ParamKey => L2Param(
         ways = 4,
         sets = 128
       )
       case DebugOptionsKey => DebugOptions()
-      case DJParamKey => DJParam(
-        rnNodeMes = rnNodeSeq
-      )
     })
 
     val top = DisableMonitors(p => LazyModule(fTop(p)))(config)
@@ -209,3 +190,4 @@ object TestTop_NHL2_DualCore_1UL extends App {
     banks = 1)(p)
   )(args)
 }
+

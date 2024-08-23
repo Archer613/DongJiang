@@ -22,7 +22,7 @@ class MSHREntry()(implicit p: Parameters) extends DJBundle {
   val respMes         = new Bundle {
     val snpRespVal    = Bool()
     val snpResp       = UInt(ChiResp.width.W)
-    val fwdStateOpt   = if (djparam.useDCT) Some(Valid(UInt(ChiResp.width.W))) else None
+    val fwdState      = Valid(UInt(ChiResp.width.W))
 
     val rdRespVal     = Bool()
     val rdResp        = UInt(ChiResp.width.W)
@@ -85,7 +85,7 @@ class MSHRCtl()(implicit p: Parameters) extends DJModule {
   val mshrSetMatchVec = mshrTableReg(blockSet).map { case m => if(djparam.mpBlockBySet) m.valid & m.tag === blockTag else m.valid & m.tag === blockTag & m.bank === blockBank }
   val mshrSetInvVec   = mshrTableReg(blockSet).map(!_.valid)
   val mshrInvWay      = PriorityEncoder(mshrSetInvVec)
-  val canReceiveReq   = !mshrSetMatchVec.reduce(_ | _) & mshrSetInvVec.reduce(_ | _)
+  val canReceiveReq   = !mshrSetMatchVec.reduce(_ | _) & PopCount(mshrSetInvVec) >= 2.U // A entry must be reserved for MainPipe Req.
 
   /*
    * Transfer Req From Node To MSHREntry
@@ -129,13 +129,7 @@ class MSHRCtl()(implicit p: Parameters) extends DJModule {
   when(io.resp2Slice.valid) {
     // Receive Snp Resp
     when(resp.isSnpResp) {
-      respMshr.waitSnpResp        := !(PopCount(respMshr.snpWaitNodeId) === 1.U) // Only has last Wait Snp Resp Task
-      respMshr.snpWaitNodeId(resp.from.rnSlvId) := false.B
-      respMshr.respMes.snpRespVal := true.B
-      respMshr.respMes.snpResp    := resp.resp
-      if (djparam.useDCT) {
-        when(resp.fwdStateOpt.get.valid) { respMshr.respMes.fwdStateOpt.get := resp.fwdStateOpt.getOrElse(0.U) }
-      }
+      // TODO
     // Receive Read Down Resp
     }.otherwise {
       respMshr.waitRDResp         := false.B

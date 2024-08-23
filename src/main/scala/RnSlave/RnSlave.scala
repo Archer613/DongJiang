@@ -1,75 +1,101 @@
 package DONGJIANG.RNSLAVE
 
-import DONGJIANG._
+import DONGJIANG. _
 import DONGJIANG.CHI._
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config._
-import xs.utils._
 import Utils.FastArb._
-import Utils.IDConnector._
+import Utils.IDConnector.idSelDec2DecVec
 
-class RnSlave(rnSlvId: Int)(implicit p: Parameters) extends NodeBase(hasReq2Slice = true, hasDBRCReq = false) {
-  val nodeParam = djparam.rnNodeMes(rnSlvId)
-
-// --------------------- IO declaration ------------------------//
-  val chiIO = IO(new Bundle {
-    // CHI
-    val chnls         = CHIBundleUpstream(chiParams)
-    val linkCtrl      = Flipped(new CHILinkCtrlIO())
-  })
-
-
+class RnSlave(rnSlvId: Int, param: InterfaceParam)(implicit p: Parameters) extends NodeBase(isSlv = true, hasReq2Slice = true, hasDBRCReq = false) {
 // --------------------- Modules declaration ------------------------//
-  val chiCtrl = Module(new InboundLinkCtrl())
+  def createReqBuf(id: Int) = { val reqBuf = Module(new RnSlvReqBuf(rnSlvId, id, param)); reqBuf }
+  val reqBufs               = (0 until param.nrReqBuf).map(i => createReqBuf(i))
+  val reqSel                = Module(new ReqBufSelector(param))
+//  val nestCtl         = Module(new NestCtl()) // TODO: Nest Ctrl
 
-  val txReq   = Module(new InboundFlitCtrl(gen = new CHIBundleREQ(chiParams), lcrdMax = nodeParam.nrRnTxLcrdMax, nodeParam.aggregateIO))
-  val txRsp   = Module(new InboundFlitCtrl(gen = new CHIBundleRSP(chiParams), lcrdMax = nodeParam.nrRnTxLcrdMax, nodeParam.aggregateIO))
-  val rxSnp   = Module(new OutboundFlitCtrl(gen = new CHIBundleSNP(chiParams), lcrdMax = nodeParam.nrRnRxLcrdMax, nodeParam.aggregateIO))
-  val rxRsp   = Module(new OutboundFlitCtrl(gen = new CHIBundleRSP(chiParams), lcrdMax = nodeParam.nrRnRxLcrdMax, nodeParam.aggregateIO))
+// --------------------- Wire declaration ------------------------//
+  val reqSelId0   = Wire(UInt(param.reqBufIdBits.W)) // Priority
+  val reqSelId1   = Wire(UInt(param.reqBufIdBits.W))
 
-  val txDat   = Module(new ChiDatIn(nrReqBuf = nodeParam.nrReqBuf, aggregateIO = nodeParam.aggregateIO))
-  val rxDat   = Module(new ChiDatOut(lcrdMax = nodeParam.nrRnRxLcrdMax, aggregateIO = nodeParam.aggregateIO))
-
-  val reqBuf  = Module(new RnSlvReqBufWrapper(rnSlvId))
+  val canReceive0 = Wire(Bool())
+  val canReceive1 = Wire(Bool())
 
 // ------------------------ Connection ---------------------------//
-  chiCtrl.io.chiLinkCtrl <> chiIO.linkCtrl
-  chiCtrl.io.rxRun := true.B // TODO
-  chiCtrl.io.txAllLcrdRetrun := txReq.io.allLcrdRetrun | txRsp.io.allLcrdRetrun | txDat.io.allLcrdRetrun
+  /*
+   * ReqBufSelector idle input
+   */
+  reqSel.io.idle  := reqBufs.map(_.io.free)
+  reqSelId0       := reqSel.io.out0
+  reqSelId1       := reqSel.io.out0
+  canReceive0     := reqSel.io.idleNum > 0.U
+  canReceive1     := reqSel.io.idleNum > 1.U
 
-  txReq.io.linkState := chiCtrl.io.txState
-  txReq.io.chi <> chiIO.chnls.txreq
-  txReq.io.flit <> reqBuf.io.chi.txreq
 
-  txRsp.io.linkState := chiCtrl.io.txState
-  txRsp.io.chi <> chiIO.chnls.txrsp
-  txRsp.io.flit <> reqBuf.io.chi.txrsp
 
-  txDat.io.linkState := chiCtrl.io.txState
-  txDat.io.chi <> chiIO.chnls.txdat
-  txDat.io.flit <> reqBuf.io.chi.txdat
-  txDat.io.dataTDB <> io.dbSigs.dataTDB
-  txDat.io.reqBufDBIDVec <> reqBuf.io.reqBufDBIDVec
+  /*
+   * connect io.chi.tx <-> reqBufs.chi.tx
+   */
+  reqBufs.map(_.io.chi).zipWithIndex.foreach {
+    case(reqBuf, i) =>
+      // txreq
+      reqBuf.txreq.valid  := io.chi.txreq.valid & reqSelId1 === i.U & canReceive1
+      reqBuf.txreq.bits   := io.chi.txreq.bits
+      // txrsp
+      reqBuf.txrsp.valid  := io.chi.txrsp.valid & io.chi.txrsp.bits.txnID === i.U
+      reqBuf.txrsp.bits   := io.chi.txrsp.bits
+      // txdat
+      reqBuf.txdat.valid  := io.chi.txdat.valid & io.chi.txrsp.bits.txnID === i.U
+      reqBuf.txdat.bits   := io.chi.txdat.bits
+      reqBuf.txdat.bits.data    := DontCare
+      reqBuf.txdat.bits.dataID  := DontCare
+  }
 
-  rxSnp.io.linkState := chiCtrl.io.rxState
-  rxSnp.io.chi <> chiIO.chnls.rxsnp
-  rxSnp.io.flit <> reqBuf.io.chi.rxsnp
+  // Set io.chi.tx_xxx.ready value
+  io.chi.txreq.ready  := canReceive1
+  io.chi.txrsp.ready  := true.B
+  io.chi.txdat.ready  := true.B
 
-  rxRsp.io.linkState := chiCtrl.io.rxState
-  rxRsp.io.chi <> chiIO.chnls.rxrsp
-  rxRsp.io.flit <> reqBuf.io.chi.rxrsp
 
-  rxDat.io.linkState := chiCtrl.io.rxState
-  rxDat.io.chi <> chiIO.chnls.rxdat
-  rxDat.io.flit <> reqBuf.io.chi.rxdat
-  rxDat.io.dataFDB <> io.dbSigs.dataFDB
-  rxDat.io.dataFDBVal <> reqBuf.io.dataFDBVal
+  /*
+   * connect io.chi.rx <-> reqBufs.chi.rx
+   */
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxsnp), io.chi.rxsnp)
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxrsp), io.chi.rxrsp)
+  fastArbDec2Dec(reqBufs.map(_.io.chi.rxdat), io.chi.rxdat)
 
-  reqBuf.io.req2Slice <> io.req2SliceOpt.get
-  reqBuf.io.resp2Node <> io.resp2NodeOpt.get
-  reqBuf.io.req2Node <> io.req2Node
-  reqBuf.io.resp2Slice <> io.resp2Slice
-  reqBuf.io.wReq <> io.dbSigs.wReq
-  reqBuf.io.wResp <> io.dbSigs.wResp
+  /*
+   * Connect slice DataBuffer signals
+   */
+  fastArbDec2Dec(reqBufs.map(_.io.dbSigs.wReq), io.dbSigs.wReq)
+  idSelDec2DecVec(io.dbSigs.wResp, reqBufs.map(_.io.dbSigs.wResp), level = 2)
+  fastArbDec2Dec(reqBufs.map(_.io.dbSigs.dataTDB), io.dbSigs.dataTDB)
+  idSelDec2DecVec(io.dbSigs.dataFDB, reqBufs.map(_.io.dbSigs.dataFDB), level = 2)
+
+  io.dbSigs.dataTDB.bits.data   := io.chi.txdat.bits.data
+  io.dbSigs.dataTDB.bits.dataID := io.chi.txdat.bits.dataID
+
+  io.chi.rxdat.bits.data        := io.dbSigs.dataFDB.bits.data
+  io.chi.rxdat.bits.dataID      := io.dbSigs.dataFDB.bits.dataID
+
+  /*
+   * Connect Slice Ctrl Signals
+   */
+  fastArbDec2Dec(reqBufs.map(_.io.req2Slice), io.req2Slice)
+  idSelDec2DecVec(io.resp2Node, reqBufs.map(_.io.resp2Node), level = 2)
+  fastArbDec2Dec(reqBufs.map(_.io.resp2Slice), io.resp2Slice)
+  reqBufs.zipWithIndex.foreach {
+    case (reqBuf, i) =>
+      reqBuf.io.req2Node.valid := io.req2Node.valid & reqSelId0 === i.U & canReceive0
+      reqBuf.io.req2Node.bits  := io.req2Node.bits
+  }
+  io.req2Node.ready := canReceive0
+
+
+
+// --------------------- Assertion ------------------------------- //
+  assert(Mux(io.chi.txrsp.valid, PopCount(reqBufs.map(_.io.chi.txrsp.fire)) === 1.U, true.B))
+  assert(Mux(io.chi.txdat.valid, PopCount(reqBufs.map(_.io.chi.txdat.fire)) === 1.U, true.B))
+
 }

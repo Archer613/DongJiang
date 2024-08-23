@@ -11,30 +11,26 @@ import scala.math.{max, min}
 // ---------------------------------------------------------------- Xbar Id Bundle ----------------------------------------------------------------------------- //
 
 object IdL0 {
-    val width      = 3
-    val SLICE      = "b000".U
-    val RNSLV      = "b001".U
-    val RNMAS      = "b010".U
-    val SNMAS      = "b011".U
-    val CMO        = "b100".U
-    val AXI        = "b101".U
+    val width      = 2
+    val SLICE      = "b00".U
+    val RNSLV      = "b01".U
+    val RNMAS      = "b10".U
+    val SNMAS      = "b11".U
 }
 
 class IDBundle(implicit p: Parameters) extends DJBundle {
-    val idL0 = UInt(IdL0.width.W) // Module: IDL0 [3.W]
-    val idL1 = UInt(max(rnNodeIdBits, bankBits).W) // SubModule: RnSlave, RnMaster, Slices
-    val idL2 = UInt(max(rnReqBufIdBits, max(snReqBufIdBits, max(mshrWayBits, rnSlvNodeIdBits))).W)// SubSubModule: RnReqBufs, SnReqBufs, mshrWays, rnSlvId
+    val idL0 = UInt(IdL0.width.W)
+    val idL1 = UInt(max(bankBits, rnslvIdBits).W)
+    val idL2 = UInt(max(max(reqBufIdBits, mshrWayBits), nodeIdBits).W)
 
     def mshrWay  = idL2
     def reqBufId = idL2
-    def rnSlvId  = idL2
+    def nodeId   = idL2
 
     def isSLICE  = idL0 === IdL0.SLICE
     def isRNSLV  = idL0 === IdL0.RNSLV
     def isRNMAS  = idL0 === IdL0.RNMAS
     def isSNMAS  = idL0 === IdL0.SNMAS
-    def isCMO    = idL0 === IdL0.CMO
-    def isAXI    = idL0 === IdL0.AXI
 }
 
 trait HasFromIDBits extends DJBundle { this: Bundle => val from = new IDBundle() }
@@ -58,8 +54,8 @@ class MSHRIndexBundle(implicit p: Parameters) extends DJBundle with HasMSHRSet w
 // ---------------------------------------------------------------- Req To Slice Bundle ----------------------------------------------------------------------------- //
 trait HasReqBaseMesBundle extends DJBundle { this: Bundle =>
     // CHI Id(Use in RnSlave)
-    val srcIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
-    val txnIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
+    val srcID       = UInt(chiParams.nodeIdBits.W)
+    val txnID       = UInt(chiParams.nodeIdBits.W)
     // Snp Mes(Use in RnMaster)
     val isSnp       = Bool()
     val doNotGoToSD = Bool()
@@ -83,16 +79,16 @@ class Req2SliceBundle(implicit p: Parameters) extends DJBundle with HasReq2Slice
 
 trait HasResp2NodeBundle extends DJBundle with HasCHIChannel { this: Bundle =>
     // CHI Id
-    val srcIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
-    val txnIDOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
+    val srcID       = UInt(chiParams.nodeIdBits.W)
+    val txnID       = UInt(chiParams.nodeIdBits.W)
     // CHI Mes
     val opcode      = UInt(6.W)
     // Indicate Snoopee final state
     val resp        = UInt(ChiResp.width.W)
     // Indicate Requster final state in DCT
-    val fwdStateOpt = if (djparam.useDCT) Some(UInt(ChiResp.width.W)) else None
+    val fwdState    = UInt(ChiResp.width.W)
     // Let ReqBuf Req Send To Slice Retry
-    val reqRetry       = Bool()
+    val reqRetry    = Bool()
 }
 
 class Resp2NodeBundleWitoutXbarId(implicit p: Parameters) extends DJBundle with HasResp2NodeBundle
@@ -103,9 +99,9 @@ class Resp2NodeBundle(implicit p: Parameters) extends DJBundle with HasResp2Node
 // ---------------------------------------------------------------- Req To Node Bundle ----------------------------------------------------------------------------- //
 trait HasReq2NodeBundle extends DJBundle with HasAddr { this: Bundle =>
     // CHI Id
-    val tgtIdOpt    = if (djparam.useInNoc) Some(UInt(chiParams.nodeIdBits.W)) else None
-    val srcIdOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
-    val txnIdOpt    = if (djparam.useDCT) Some(UInt(chiParams.nodeIdBits.W)) else None
+    val tgtId       = UInt(chiParams.nodeIdBits.W)
+    val srcId       = UInt(chiParams.nodeIdBits.W)
+    val txnId       = UInt(chiParams.nodeIdBits.W)
     // Snp Mes (Use in RnSlave)
     val retToSrc    = Bool()
     val doNotGoToSD = Bool()
@@ -129,7 +125,7 @@ trait HasResp2SliceBundle extends DJBundle with HasDBID with HasMSHRSet { this: 
     // Indicate Snoopee final state
     val resp        = UInt(ChiResp.width.W)
     // Indicate Requster final state in DCT
-    val fwdStateOpt = if (djparam.useDCT) Some(Valid(UInt(ChiResp.width.W))) else None
+    val fwdState    = Valid(UInt(ChiResp.width.W))
 }
 
 class Resp2SliceBundleWitoutXbarId(implicit p: Parameters) extends DJBundle with HasResp2SliceBundle
@@ -167,6 +163,8 @@ class DBBundle(hasDBRCReq: Boolean = false)(implicit p: Parameters) extends DJBu
     val wResp       = Flipped(Decoupled(new DBWResp))
     val dataFDB     = Flipped(Decoupled(new NodeFDBData))
     val dataTDB     = Decoupled(new NodeTDBData)
+
+    def dbRCReq     = dbRCReqOpt.get
 }
 
 
