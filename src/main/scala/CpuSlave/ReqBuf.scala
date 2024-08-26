@@ -89,7 +89,7 @@ class ReqBuf()(implicit p: Parameters) extends DSUModule {
     task.to.idL0    := IdL0.SLICE
     task.to.idL1    := parseAddress(txreq.addr)._2
     // task other
-    task.writeBt    := txreq.opcode === CHIOp.REQ.WriteBackFull
+    task.writeBt    := true.B
     task.readDir    := true.B
     task.willSnp    := !task.isWB
     // other
@@ -285,7 +285,7 @@ class ReqBuf()(implicit p: Parameters) extends DSUModule {
     // send
     fsmReg.s_req2mp   := true.B
     fsmReg.s_resp     := true.B
-    // fsmReg.s_clean    := true.B
+    fsmReg.s_clean    := true.B
     // wait
     fsmReg.w_mpResp   := true.B
     fsmReg.w_compAck  := io.chi.txreq.bits.expCompAck
