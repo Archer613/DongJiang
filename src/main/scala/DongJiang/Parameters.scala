@@ -79,7 +79,7 @@ case class DJParam(
                     interfaceMes: Seq[InterfaceParam] = Seq(InterfaceParam( name = "RnSalve_LOCAL",  isRn = true,   isSlave = true,  preferTgtIdMap = Some(Seq(2, 3)) ),
                                                             InterfaceParam( name = "SnMaster_LOCAL", isRn = false,  isSlave = false, addressId = Some(0), addressIdBits = Some(1) ),
                                                             InterfaceParam( name = "RnSalve_CSN",    isRn = true,   isSlave = true,  preferTgtIdMap = Some(Seq(0)) ),
-//                                                            InterfaceParam( name = "RnMaster_CSN",   isRn = true,   isSlave = false, addressId = Some(1), addressIdBits = Some(1) )
+                                                            InterfaceParam( name = "RnMaster_CSN",   isRn = true,   isSlave = false, addressId = Some(1), addressIdBits = Some(1) )
                     ),
                     // ------------------------- Node Mes -------------------- //
                     nodeMes: Seq[NodeParam] = Seq(  NodeParam( name = "RN_CSN",     nodeId = 0, isRN = true ),

@@ -9,9 +9,6 @@ import Utils.FastArb._
 import Utils.IDConnector.idSelDec2DecVec
 
 class RnMaster(rnMasId: Int, param: InterfaceParam)(implicit p: Parameters) extends NodeBase(isSlv = false, hasReq2Slice = true, hasDBRCReq = true) {
-// --------------------- IO declaration ------------------------//
-  val chi = IO(CHIBundleDecoupled(chiParams))
-
 // --------------------- Modules declaration ------------------------//
   def createReqBuf(id: Int) = { val reqBuf = Module(new RnMasReqBuf(rnMasId, id, param)); reqBuf }
   val reqBufs               = (0 until param.nrReqBuf).map(i => createReqBuf(i))
