@@ -146,6 +146,7 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
   /*
    * Recieve task_s2
    */
+  dontTouch(task_s2)
   task_s3_g.valid := Mux(task_s2.valid, true.B, task_s3_g.valid & !canGo_s3)
   taskNext_s3 := Mux(task_s2.valid & canGo_s2, task_s2.bits, task_s3_g.bits)
   task_s3_g.bits := taskNext_s3
@@ -270,24 +271,33 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
    * *** 1:[DS]  --d1--> [DB] --d1--> [MS]
    * *** 2:[DB]  --d0--> [DS]
    */
-  val rDS = needResp_s3 & !needRDown & !needSnp & taskResp_s3.isRxDat
+  val rDS = WireInit(false.B)
+  // val rDS = needResp_s3 & !needRDown & !needSnp & taskResp_s3.isRxDat
+
   val wDS = needWDS
   val rwDS = needWDS & needRepl
   val replTxnid = Cat(parseBTAddress(self_s3.addr)._2, task_s3_g.bits.btWay)
   switch(taskTypeVec.asUInt) {
+    is(CPU_REQ_OH)    { rDS := needResp_s3 & !needRDown & !needSnp & taskResp_s3.isRxDat }
+    is(CPU_WRITE_OH)  { rDS := false.B }
+    is(MS_RESP_OH)    { rDS := false.B }
+    is(SNP_RESP_OH)   { rDS := !task_s3_g.bits.snpHasData & taskResp_s3.isRxDat}
+  }
+  switch(taskTypeVec.asUInt) {
     is(CPU_REQ_OH)    { needRWDS_s3 := rDS }
     is(CPU_WRITE_OH)  { needRWDS_s3 := wDS | rwDS }
     is(MS_RESP_OH)    { needRWDS_s3 := false.B }
-    is(SNP_RESP_OH)   { needRWDS_s3 := wDS | rwDS }
+    is(SNP_RESP_OH)   { needRWDS_s3 := rwDS | wDS | rDS }
   }
+
   io.dsReq.valid := needRWDS_s3 & !doneRWDS_s3
   io.dsReq.bits.addr := task_s3_g.bits.addr
   io.dsReq.bits.wayOH := self_s3.wayOH
   io.dsReq.bits.ren := rDS | rwDS
   io.dsReq.bits.wen := wDS | rwDS
-  io.dsReq.bits.to.idL0 := Mux(needRepl, IdL0.MASTER, task_s3_g.bits.from.idL0)
-  io.dsReq.bits.to.idL1 := Mux(needRepl, DontCare,    task_s3_g.bits.from.idL1)
-  io.dsReq.bits.to.idL2 := Mux(needRepl, replTxnid,   task_s3_g.bits.from.idL2)
+  io.dsReq.bits.to.idL0 := Mux(needRepl, IdL0.MASTER, task_s3_g.bits.to.idL0)
+  io.dsReq.bits.to.idL1 := Mux(needRepl, DontCare,    task_s3_g.bits.to.idL1)
+  io.dsReq.bits.to.idL2 := Mux(needRepl, replTxnid,   task_s3_g.bits.to.idL2)
   io.dsReq.bits.dbid := task_s3_g.bits.dbid
 
 
@@ -298,13 +308,13 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
     is(CPU_REQ_OH)    { needReadDB_s3 := false.B } // data from DS
     is(CPU_WRITE_OH)  { needReadDB_s3 := false.B }
     is(MS_RESP_OH)    { needReadDB_s3 := needResp_s3 & io.cpuResp.bits.isRxDat }
-    is(SNP_RESP_OH)   { needReadDB_s3 := (needResp_s3 & io.cpuResp.bits.isRxDat) | (task_s3_g.bits.isSnpHlp & task_s3_g.bits.snpHasData & !needRWDS_s3) }
+    is(SNP_RESP_OH)   { needReadDB_s3 := (needResp_s3 & io.cpuResp.bits.isRxDat & task_s3_g.bits.snpHasData) | (task_s3_g.bits.isSnpHlp & task_s3_g.bits.snpHasData & !needRWDS_s3) }
   }
   io.dbRCReq.valid := needReadDB_s3 & !doneReadDB_s3
   io.dbRCReq.bits.to := task_s3_g.bits.to
   io.dbRCReq.bits.dbid := task_s3_g.bits.dbid
   io.dbRCReq.bits.isRead := !task_s3_g.bits.isSnpHlp
-  io.dbRCReq.bits.isClean := !wDS // snoop data will be clean by DS
+  io.dbRCReq.bits.isClean := !rwDS // snoop data will be clean by DS
 
 
   /*
@@ -363,6 +373,7 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
   // io
   io.cpuResp.valid      := needResp_s3 & !doneResp_s3
   io.cpuResp.bits       := taskResp_s3
+  dontTouch(taskResp_s3)
 
 
   /*
@@ -442,7 +453,7 @@ class MainPipe()(implicit p: Parameters) extends DSUModule {
   assert(Mux(dirRes_s3.valid, PopCount(dirRes_s3.bits.client.wayOH) === 1.U, true.B), "OneHot Error")
 
   assert(Mux(io.dsReq.fire & io.dsReq.bits.wen & taskTypeVec(SNP_RESP), task_s3_g.bits.snpHasData, true.B))
-  assert(Mux(io.cpuResp.fire & io.cpuResp.bits.isRxDat & taskTypeVec(SNP_RESP), task_s3_g.bits.snpHasData, true.B))
+  // assert(Mux(io.cpuResp.fire & io.cpuResp.bits.isRxDat & taskTypeVec(SNP_RESP), task_s3_g.bits.snpHasData, true.B))
 
   // TIME OUT CHECK
   val cntReg = RegInit(0.U(64.W))

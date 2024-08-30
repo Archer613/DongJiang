@@ -266,7 +266,7 @@ object Coherence {
         }
       }
       is(CHIOp.REQ.MakeUnique) {
-          othRnNS := I; hnNS := I; srcRnNS := UD; error := snpResp === ChiResp.I
+          othRnNS := I; hnNS := I; srcRnNS := UD; error := !(snpResp === ChiResp.I)
       }
     }
     (srcRnNS, othRnNS, hnNS, error)
